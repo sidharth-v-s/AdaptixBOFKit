@@ -1,18 +1,19 @@
 # AdaptixBOFKit
 
 A self-contained [AdaptixC2](https://github.com/Adaptix-Framework/AdaptixC2) extension
-that implements **109 Windows x64 BOFs** (**140 registered commands**, including
+that implements **152 Windows x64 BOFs** (**183 registered commands**, including
 aliases) across the kill chain: situational awareness, network/AD enumeration,
-credential access, Kerberos key derivation, privilege escalation, defense
-evasion, persistence and post-exploitation.
+credential access, Kerberos key derivation and roasting, token manipulation,
+lateral movement, process injection, privilege escalation, defense evasion,
+persistence and post-exploitation.
 
 The BOFs are original, CRT-free C implementations that use Adaptix's
 `DLL$Function` import convention and only the Beacon APIs documented as
 supported by Adaptix. They are compiled to position-independent x64 COFF
 objects and registered through an AxScript extension.
 
-Coverage is tracked in [`COVERAGE.md`](COVERAGE.md): 114 native, 18 partially
-native, 109 upstream-only (heavy projects such as nanodump, Kerbeus, DCSync,
+Coverage is tracked in [`COVERAGE.md`](COVERAGE.md): 147 native, 31 partially
+native, 99 upstream-only (heavy projects such as nanodump, Kerbeus, DCSync,
 ADCS, CLR hosting, SQL-BOF and BYOVD).
 
 ---
@@ -29,8 +30,10 @@ AdaptixBOFKit/
 │   ├── beacon.h             # Adaptix-supported Beacon API surface
 │   ├── bofdefs.h            # DLL$Function declarations
 │   ├── helpers.h            # CRT-free string/memory/format helpers
+│   ├── sqlite.h             # minimal read-only SQLite reader
+│   ├── tokenhelpers.h       # token name/SID/elevation helpers
 │   └── ldaphelpers.h        # LDAP bind / rootDSE helpers
-├── src/                     # 109 BOF sources (one go() per file)
+├── src/                     # 152 BOF sources (one go() per file)
 └── _bin/                    # generated: <name>.x64.o
 ```
 
@@ -75,13 +78,13 @@ The extension registers command groups:
 
 | Group | Commands |
 |---|---|
-| `AdaptixBOFKit-Recon` (46) | `bof-whoami`, `bof-env`, `bof-ipconfig`, `bof-arp`, `bof-netstat`, `bof-routeprint`, `bof-uptime`, `bof-listpipes`, `bof-drives`, `bof-locale`, `bof-resources`, `bof-windowlist`, `bof-listmods`, `bof-sessions`, `bof-dir`, `bof-proclist`, `bof-services`, `bof-drivers`, `bof-useridletime`, `bof-sessioninfo`, `bof-regqueryrec`, `bof-auditpol`, `bof-findmodule`, `bof-filterdrivers`, `bof-scenum`, `bof-regsession`, `bof-edrrecon`, `bof-enumsysmon`, `bof-whereami`, `bof-enumrwx`, `bof-vulndrivers`, `bof-enumdotnet`, `bof-safeharbor`, `bof-enumdrives`, `bof-enumlib`, `bof-cacls`, `bof-geolocation`, `bof-evtxsearch`, `bof-finduserhooks`, `bof-enumhandles`, `bof-EnumHandles`, `bof-processhandles`, `bof-ProcessListHandles`, `bof-killprocess`, `bof-vssenum`, `bof-wfpenum` |
-| `AdaptixBOFKit-Network` (17) | `bof-portscan`, `bof-nslookup`, `bof-netshares`, `bof-netview`, `bof-netuse`, `bof-netuse-list`, `bof-nettime`, `bof-netloggedon`, `bof-netsession`, `bof-listdns`, `bof-probe`, `bof-smbinfo`, `bof-enumwebclient`, `bof-portscanbof`, `bof-netsession2`, `bof-netuse_add`, `bof-nbtscan` |
-| `AdaptixBOFKit-AD` (20) | `bof-netuser`, `bof-netlocalgroups`, `bof-netlocalgroupmembers`, `bof-domaingroups`, `bof-netgroupmembers`, `bof-passwordpolicy`, `bof-domaininfo`, `bof-ldapsearch`, `bof-addmachineaccount`, `bof-lapsdump`, `bof-netgrouplist`, `bof-netgrouplistmembers`, `bof-netgrouplistmembers2`, `bof-netlocalgrouplist`, `bof-netlocalgrouplistmembers`, `bof-get_password_policy`, `bof-adcs_enum`, `bof-adcs_enum_com`, `bof-adcs_enum_com2`, `bof-ldapsecuritycheck` |
-| `AdaptixBOFKit-Creds` (13) | `bof-credman`, `bof-wifi`, `bof-autologon`, `bof-procdump`, `bof-regsave`, `bof-dpapissystem`, `bof-certdump`, `bof-clipboard`, `bof-notethief`, `bof-klist`, `bof-kerbhash`, `bof-dumpwifi`, `bof-wifipasswords` |
-| `AdaptixBOFKit-Privesc-Evasion` (14) | `bof-tokenpriv`, `bof-uacstatus`, `bof-unhook`, `bof-etwpatch`, `bof-amsipatch`, `bof-hidefile`, `bof-cleareventlog`, `bof-add-exclusion`, `bof-enableefs`, `bof-blindeventlog`, `bof-enumexclusions`, `bof-delexclusion`, `bof-get_priv`, `bof-startwebclient` |
+| `AdaptixBOFKit-Recon` (55) | `bof-whoami`, `bof-env`, `bof-ipconfig`, `bof-arp`, `bof-netstat`, `bof-routeprint`, `bof-uptime`, `bof-listpipes`, `bof-drives`, `bof-locale`, `bof-resources`, `bof-windowlist`, `bof-listmods`, `bof-sessions`, `bof-dir`, `bof-proclist`, `bof-services`, `bof-drivers`, `bof-tasklist`, `bof-netconn`, `bof-driversigs`, `bof-wmi_query`, `bof-msi-search`, `bof-useridletime`, `bof-sessioninfo`, `bof-regqueryrec`, `bof-auditpol`, `bof-findmodule`, `bof-filterdrivers`, `bof-scenum`, `bof-regsession`, `bof-edrrecon`, `bof-enumsysmon`, `bof-whereami`, `bof-enumrwx`, `bof-vulndrivers`, `bof-enumdotnet`, `bof-safeharbor`, `bof-enumdrives`, `bof-enumlib`, `bof-cacls`, `bof-geolocation`, `bof-evtxsearch`, `bof-finduserhooks`, `bof-enumhandles`, `bof-EnumHandles`, `bof-processhandles`, `bof-ProcessListHandles`, `bof-killprocess`, `bof-vssenum`, `bof-wfpenum`, `bof-screenspy`, `bof-keylogger`, `bof-browserhist`, `bof-findcreds` |
+| `AdaptixBOFKit-Network` (22) | `bof-portscan`, `bof-nslookup`, `bof-netshares`, `bof-netview`, `bof-netuse`, `bof-netuse-list`, `bof-nettime`, `bof-netloggedon`, `bof-netsession`, `bof-listdns`, `bof-probe`, `bof-smbinfo`, `bof-enumwebclient`, `bof-portscanbof`, `bof-netsession2`, `bof-netuse_add`, `bof-nbtscan`, `bof-smbexec`, `bof-wmiexec`, `bof-dcomexec`, `bof-scshell`, `bof-winrm-exec` |
+| `AdaptixBOFKit-AD` (25) | `bof-netuser`, `bof-netlocalgroups`, `bof-netlocalgroupmembers`, `bof-domaingroups`, `bof-netgroupmembers`, `bof-passwordpolicy`, `bof-domaininfo`, `bof-ldapsearch`, `bof-addmachineaccount`, `bof-lapsdump`, `bof-netgrouplist`, `bof-netgrouplistmembers`, `bof-netgrouplistmembers2`, `bof-netlocalgrouplist`, `bof-netlocalgrouplistmembers`, `bof-get_password_policy`, `bof-adcs_enum`, `bof-adcs_enum_com`, `bof-adcs_enum_com2`, `bof-ldapsecuritycheck`, `bof-kerberoast`, `bof-spnroast`, `bof-asreproast`, `bof-gpocheck`, `bof-trustdump` |
+| `AdaptixBOFKit-Creds` (18) | `bof-credman`, `bof-wifi`, `bof-autologon`, `bof-procdump`, `bof-regsave`, `bof-dpapissystem`, `bof-certdump`, `bof-clipboard`, `bof-notethief`, `bof-klist`, `bof-kerbhash`, `bof-dumpwifi`, `bof-wifipasswords`, `bof-vaultdump`, `bof-dpapiblobdec`, `bof-chromecreds`, `bof-recentfiles`, `bof-sshagentkeys` |
+| `AdaptixBOFKit-Privesc-Evasion` (30) | `bof-tokenpriv`, `bof-uacstatus`, `bof-unhook`, `bof-etwpatch`, `bof-amsipatch`, `bof-hidefile`, `bof-cleareventlog`, `bof-add-exclusion`, `bof-enableefs`, `bof-blindeventlog`, `bof-enumexclusions`, `bof-delexclusion`, `bof-get_priv`, `bof-startwebclient`, `bof-dllhijack`, `bof-maketoken`, `bof-stealtoken`, `bof-reverttoken`, `bof-listimpersonation`, `bof-getsystem-svc`, `bof-injectapc`, `bof-injectthread`, `bof-earlybird`, `bof-ghostwrite`, `bof-ppidspoof`, `bof-blockdlls`, `bof-acldeny`, `bof-timestomp`, `bof-schtaskshide`, `bof-threadhide` |
 | `AdaptixBOFKit-Persistence` (21) | `bof-regquery`, `bof-regset`, `bof-regdelete`, `bof-runkey`, `bof-svc-create`, `bof-svc-delete`, `bof-sc-config`, `bof-sc-start`, `bof-sc-stop`, `bof-schtasksenum`, `bof-schtasksquery`, `bof-schtaskscreate`, `bof-schtasksdelete`, `bof-schtasksrun`, `bof-AddTaskScheduler`, `bof-DelTaskScheduler`, `bof-comhunter`, `bof-trustme`, `bof-addlocalcert`, `bof-addfirewallrule`, `bof-lnkgenerator` |
-| `AdaptixBOFKit-Post` (9) | `bof-inject`, `bof-hashfile`, `bof-download`, `bof-screenshot`, `bof-enumfiles`, `bof-md5`, `bof-sha1`, `bof-sha256`, `bof-executesession` |
+| `AdaptixBOFKit-Post` (12) | `bof-inject`, `bof-hashfile`, `bof-download`, `bof-screenshot`, `bof-enumfiles`, `bof-md5`, `bof-sha1`, `bof-sha256`, `bof-executesession`, `bof-selfdelete`, `bof-prefetchdel`, `bof-clearmplog` |
 
 All commands are registered for the `beacon` agent on Windows, all listeners.
 
@@ -102,6 +105,7 @@ Extension-Kit.
 | `bof-ipconfig` | `bof-ipconfig` | IPv4 adapters, gateways, DNS servers |
 | `bof-arp` | `bof-arp` | IPv4 ARP table |
 | `bof-netstat` | `bof-netstat` | TCP/UDP endpoints and states |
+| `bof-netconn` | `bof-netconn` | TCP/UDP endpoints with owning PID and process |
 | `bof-routeprint` | `bof-routeprint` | IPv4 routing table |
 | `bof-uptime` | `bof-uptime` | Current/boot UTC time and uptime |
 | `bof-listpipes` | `bof-listpipes` | Named pipes |
@@ -113,8 +117,12 @@ Extension-Kit.
 | `bof-sessions` | `bof-sessions` | WTS/RDP sessions, users and clients |
 | `bof-dir` | `bof-dir C:\Windows /s` | Directory listing, optional recursive |
 | `bof-proclist` | `bof-proclist` | PID, PPID, threads, full image path |
+| `bof-tasklist` | `bof-tasklist svchost` | PID, PPID, image and full command line |
 | `bof-services` | `bof-services` | Win32 services, state and PID |
 | `bof-drivers` | `bof-drivers` | Kernel drivers registered with SCM |
+| `bof-driversigs` | `bof-driversigs` | Driver files with Authenticode status and signer |
+| `bof-wmi_query` | `bof-wmi_query "SELECT ProcessId,Name,CommandLine FROM Win32_Process"` | Read-only WQL query against `ROOT\CIMV2` |
+| `bof-msi-search` | `bof-msi-search chrome` | Installed MSI products, versions and paths |
 | `bof-useridletime` | `bof-useridletime` | Seconds since last keyboard/mouse input |
 | `bof-sessioninfo` | `bof-sessioninfo` | LSA logon session, type, SID, LUID |
 | `bof-regqueryrec` | `bof-regqueryrec HKLM SOFTWARE\Test 3` | Recursive registry dump |
@@ -139,6 +147,10 @@ Extension-Kit.
 | `bof-killprocess` | `bof-killprocess 1234` | Terminate a process |
 | `bof-vssenum` | `bof-vssenum list` | Shadow copies (`providers` for providers) |
 | `bof-wfpenum` | `bof-wfpenum all` | WFP filters and sublayers |
+| `bof-screenspy` | `bof-screenspy C:\Windows\Temp\shots 5 5` | Repeated desktop captures to numbered BMPs |
+| `bof-keylogger` | `bof-keylogger 30` | Duration-limited low-level keyboard hook, flushed on return |
+| `bof-browserhist` | `bof-browserhist all 50` | Recent Chrome/Edge history from a copied SQLite DB |
+| `bof-findcreds` | `bof-findcreds C:\Users 6` | Recursive credential-file name/content hunt |
 
 ### Network
 
@@ -158,6 +170,11 @@ Extension-Kit.
 | `bof-smbinfo` | `bof-smbinfo 10.0.0.5` | Workstation/domain/OS info |
 | `bof-enumwebclient` | `bof-enumwebclient 10.0.0.5` | WebClient (WebDAV) service state |
 | `bof-nbtscan` | `bof-nbtscan 10.0.0.5,10.0.0.6` | NetBIOS node status names and services |
+| `bof-smbexec` | `bof-smbexec DC01 "whoami > C:\Windows\Temp\out.txt"` | Temporary SCM service with output to a remote file |
+| `bof-wmiexec` | `bof-wmiexec DC01 "cmd.exe /c whoami"` | `Win32_Process::Create` over DCOM/WMI |
+| `bof-dcomexec` | `bof-dcomexec DC01 cmd.exe "/c whoami"` | `Shell.Application` DCOM execution |
+| `bof-scshell` | `bof-scshell DC01 Browser "cmd.exe /c whoami"` | Reconfigure an existing service, then restore it |
+| `bof-winrm-exec` | `bof-winrm-exec DC01 "whoami"` | Drives `winrs.exe` and captures stdout through a pipe |
 
 ### AD / accounts
 
@@ -171,12 +188,17 @@ Extension-Kit.
 | `bof-passwordpolicy` / `bof-get_password_policy` | `bof-passwordpolicy CORP` | Password and lockout policy |
 | `bof-domaininfo` | `bof-domaininfo` | Join status, FQDN, DC |
 | `bof-ldapsearch` | `bof-ldapsearch (objectClass=user) cn,sAMAccountName` | Generic LDAP search |
+| `bof-kerberoast` | `bof-kerberoast all` | SPN and AS-REP roastable accounts with password age |
 | `bof-addmachineaccount` | `bof-addmachineaccount EVILPC01` | Add a computer object over LDAP |
 | `bof-lapsdump` | `bof-lapsdump` | Read `ms-Mcs-AdmPwd` from AD |
 | `bof-regsession` | `bof-regsession` | Logged-on SIDs (BOFHound input) |
 | `bof-adcs_enum` | `bof-adcs_enum all` | Local CAs, templates, enrollment services, ESC1 hints |
 | `bof-adcs_enum_com` / `bof-adcs_enum_com2` | `bof-adcs_enum_com templates` | Aliases of `bof-adcs_enum` |
 | `bof-ldapsecuritycheck` | `bof-ldapsecuritycheck` | LDAP signing and channel-binding verdict |
+| `bof-spnroast` | `bof-spnroast` | Request service tickets with SSPI and emit hashcat lines |
+| `bof-asreproast` | `bof-asreproast` | Find `DONT_REQ_PREAUTH` accounts over LDAP |
+| `bof-gpocheck` | `bof-gpocheck` | GPO links plus GPP `cpassword` decryption from SYSVOL |
+| `bof-trustdump` | `bof-trustdump` | Domain trusts, direction, type, attributes and SID |
 
 ### Credentials / Kerberos
 
@@ -193,6 +215,11 @@ Extension-Kit.
 | `bof-notethief` | `bof-notethief` | Text from open Notepad windows |
 | `bof-klist` | `bof-klist` | Cached Kerberos tickets |
 | `bof-kerbhash` | `bof-kerbhash Password123 alice CORP.LOCAL` | RC4 + AES128/192/256 keys |
+| `bof-vaultdump` | `bof-vaultdump` | Enumerate Windows Vault containers and item metadata |
+| `bof-dpapiblobdec` | `bof-dpapiblobdec 01000000d08c9ddf...` | Decrypt a hex DPAPI blob in the current user context |
+| `bof-chromecreds` | `bof-chromecreds all` | Chrome/Edge saved logins (legacy DPAPI; modern AES-GCM reported encrypted) |
+| `bof-recentfiles` | `bof-recentfiles` | Recent `.lnk` targets and jump-list inventory |
+| `bof-sshagentkeys` | `bof-sshagentkeys` | Public identities and fingerprints from the OpenSSH agent |
 
 ### Privilege / evasion
 
@@ -210,6 +237,18 @@ Extension-Kit.
 | `bof-delexclusion` | `bof-delexclusion paths C:\Temp` | Remove an exclusion |
 | `bof-enableefs` | `bof-enableefs` | Start the EFS service |
 | `bof-blindeventlog` | `bof-blindeventlog suspend` | Suspend/resume EventLog threads |
+| `bof-dllhijack` | `bof-dllhijack all` | Unquoted service paths and writable service/AppInit dirs |
+| `bof-maketoken` | `bof-maketoken alice Passw0rd! CORP` | `LogonUser` + `ImpersonateLoggedOnUser` |
+| `bof-stealtoken` | `bof-stealtoken 1234` | Duplicate and impersonate another process token |
+| `bof-reverttoken` | `bof-reverttoken` | Drop thread impersonation |
+| `bof-listimpersonation` | `bof-listimpersonation` | Thread impersonation vs. process primary token |
+| `bof-getsystem-svc` | `bof-getsystem-svc bof_getsystem 30` | Named-pipe impersonation server (coercion half) |
+| `bof-ppidspoof` | `bof-ppidspoof 1234 C:\Windows\System32\cmd.exe` | Spawn with `PROC_THREAD_ATTRIBUTE_PARENT_PROCESS` |
+| `bof-blockdlls` | `bof-blockdlls C:\Windows\System32\cmd.exe` | Child loads only Microsoft-signed DLLs |
+| `bof-acldeny` | `bof-acldeny file C:\Windows\Temp\payload.exe` | Deny read/execute ACE on a file or registry key |
+| `bof-timestomp` | `bof-timestomp C:\Windows\Temp\payload.exe "2024-01-01 12:00:00"` | Overwrite user-visible timestamps (`copy <src>` supported) |
+| `bof-schtaskshide` | `bof-schtaskshide \Microsoft\Windows\MyTask` | Deny Users read on a task; `restore` to undo |
+| `bof-threadhide` | `bof-threadhide` | `NtSetInformationThread(ThreadHideFromDebugger)` |
 
 ### Registry / persistence
 
@@ -246,27 +285,37 @@ Extension-Kit.
 | `bof-screenshot` | `bof-screenshot C:\Temp\screen.bmp` | Desktop capture to 32-bit BMP |
 | `bof-enumfiles` | `bof-enumfiles C:\Users *.txt password` | Recursive name/content search |
 | `bof-executesession` | `bof-executesession 2 C:\Windows\System32\cmd.exe` | Launch in another session via WTS token |
+| `bof-injectapc` | `bof-injectapc 1234 C:\Windows\Temp\payload.bin` | Queue-user-APC shellcode injection |
+| `bof-injectthread` | `bof-injectthread 1234 C:\Windows\Temp\payload.bin` | Remote injection through `NtCreateThreadEx` |
+| `bof-earlybird` | `bof-earlybird C:\Windows\System32\notepad.exe C:\Windows\Temp\payload.bin` | APC injection into a suspended process before entry |
+| `bof-ghostwrite` | `bof-ghostwrite 1234 C:\Windows\Temp\payload.bin` | Section-backed injection without `WriteProcessMemory` |
+| `bof-selfdelete` | `bof-selfdelete reboot` | Reboot/helper-based removal of the agent image |
+| `bof-prefetchdel` | `bof-prefetchdel mimikatz.exe` | Delete matching Prefetch entries |
+| `bof-clearmplog` | `bof-clearmplog all` | Clear Defender Operational/WHC event logs |
 
 ---
 
 ## Coverage
 
-[`COVERAGE.md`](COVERAGE.md) contains a row-by-row coverage map for all **241**
+[`COVERAGE.md`](COVERAGE.md) contains a row-by-row coverage map for all **277**
 rows. The short version:
 
-- **Native (114 rows):** recon, networking, account/AD enumeration, LDAP,
+- **Native (147 rows):** recon, networking, account/AD enumeration, LDAP,
   registry, services, scheduled tasks, VSS, ADCS, WFP, handle introspection,
   credential-manager, DPAPI secret, certificate, clipboard,
   Kerberos ticket/key, injection, hashing, Defender, event log and file
-  utilities, COM/trust-provider persistence, firewall rules and shortcuts.
-- **Partially native (18 rows):** `tasklist`, `EnumWSC`, `EnumSecProducts`,
-  `SafeHarbor`, `SilenceSysmon`, `GeoLocation_BOF`,
-  `ExecuteCrossSession`, `TrustMeBOF`, LDAP/OSEP suites, etc.
-- **Upstream (109 rows):** LSASS dumping suites (nanodump, PPLDump, WerDump,
+  utilities, COM/trust-provider persistence, firewall rules and shortcuts,
+  token manipulation, lateral execution, process injection, timestomping
+  and task/ACL hiding.
+- **Partially native (31 rows):** `Kerberoast`, `DllEnvHijacking`, `EnumWSC`,
+  `EnumSecProducts`, `SafeHarbor`, `SilenceSysmon`, `GeoLocation_BOF`,
+  `ExecuteCrossSession`, `TrustMeBOF`, `VaultDumpBOF`, WinRM, GPO secret
+  decryption fallbacks, browser credential/history readers, keylogging,
+  LDAP/OSEP suites, etc.
+- **Upstream (99 rows):** LSASS dumping suites (nanodump, PPLDump, WerDump,
   GhostKatz), Kerberos/Rubeus ports, DCSync, ADCS request/exploit chains, CLR
   hosting, PoolParty and other injection families, SQL-BOF, BYOVD,
-  clipboard-history/browser credential thieves, and similar multi-file
-  projects.
+  clipboard-history thieves and similar multi-file projects.
 
 For the upstream rows use the **official Adaptix Extension-Kit**, which already
 packages and maintains them for Adaptix:

@@ -10,7 +10,7 @@ it.
   tool is still better for the full feature set.
 - **Upstream** — a separate, substantial project (license, size, or technique).
 
-Summary: **114 native**, **18 partially native**, **109 upstream-only**.
+Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows).
 
 > Commands are shown with their `bof-` prefix. See `README.md` for arguments.
 >
@@ -20,7 +20,7 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 > `AddExclusion` and `DelExclusion`; `bof-svc-create`, `bof-sc-config`,
 > `bof-sc-start` and `bof-sc-stop` cover `SCCreate`, `SCConfig`, `SCStart`
 > and `SCStop`). The native row count below therefore is not the same as the
-> number of compiled objects (109 objects, 140 registered commands).
+> number of compiled objects (152 objects, 183 registered commands).
 
 ## 🔍 Reconnaissance & Situational Awareness
 
@@ -34,7 +34,7 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `routeprint` | Native | `bof-routeprint` |
 | `listpipes` | Native | `bof-listpipes` |
 | `listmods [pid]` | Native | `bof-listmods` |
-| `driversigs` | Upstream | `trustedsec/CS-Situational-Awareness-BOF` |
+| `driversigs` | Native | `bof-driversigs` |
 | `enum_filter_driver` | Native | `bof-filterdrivers` |
 | `enumLocalSessions` | Native | `bof-sessions` |
 | `windowlist` | Native | `bof-windowlist` |
@@ -44,8 +44,8 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `get_session_info` | Native | `bof-sessioninfo` |
 | `get_password_policy [host]` | Native | `bof-passwordpolicy` |
 | `useridletime` | Native | `bof-useridletime` |
-| `wmi_query` | Upstream | `trustedsec/CS-Situational-Awareness-BOF` |
-| `tasklist [opt:server]` | Native (partial) | `bof-proclist (no command line)` |
+| `wmi_query` | Native | `bof-wmi_query` |
+| `tasklist [opt:server]` | Native | `bof-tasklist` (command lines via NtQueryInformationProcess/PEB) |
 | `sc_enum` | Native | `bof-scenum` |
 | `schtasksenum` | Native | `bof-schtasksenum` (`schtasks enum`) |
 | `schtasksquery [taskpath]` | Native | `bof-schtasksquery` (`schtasks query`) |
@@ -129,7 +129,7 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `dcsync-bof` | Upstream | `kozmer/dcsync-bof` |
 | `dumpguard_bof` | Upstream | `0xedh/dumpguard_bof` |
 | `CredManBOF` | Native | `bof-credman` |
-| `VaultDumpBOF` | Upstream | `MeirV2-2/VaultDumpBOF` |
+| `VaultDumpBOF` | Native (partial) | `bof-vaultdump` (enumerates items; protected data not decrypted) |
 | `DPAPI_BOF` | Upstream | `Bhanunamikaze/DPAPI_BOF` |
 | `chryzsh/redteam-bofs` | Upstream | `chryzsh/redteam-bofs` |
 | `ChromeKatz` | Upstream | see bofs.md entry |
@@ -151,6 +151,11 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `aad-bofs` | Upstream | `kozmer/aad-bofs` |
 | `get_azure_token` | Upstream | trustedsec/CS-Remote-OPs-BOF |
 | `BAADTokenBroker` | Upstream | `temp43487580/...` |
+| `dpapiblobdec` | Native | `bof-dpapiblobdec` (hex DPAPI blob) |
+| `chromecreds` | Native (partial) | `bof-chromecreds` (legacy DPAPI blobs; modern AES-GCM/ABE reported encrypted) |
+| `recentfiles` | Native (partial) | `bof-recentfiles` (Recent LNKs/`LinkInfo`; jump-list LNK streams not parsed) |
+| `sshagentkeys` | Native (partial) | `bof-sshagentkeys` (public identities only; agent never exposes private keys) |
+| `vaultdump` | Native (partial) | `bof-vaultdump` (enumerate vault items; no decryption) |
 
 ## 🎫 Kerberos Attacks
 
@@ -158,7 +163,7 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 |---|---|---|
 | `Kerbeus-BOF` | Upstream | `RalfHacker/Kerbeus-BOF` |
 | `nanorobeus` | Upstream | `wavvs/nanorobeus` |
-| `Kerberoast` | Upstream | outflanknl/C2-Tool-Collection |
+| `Kerberoast` | Native (partial) | `bof-kerberoast` (enumerates targets) + `bof-spnroast` (requests tickets with the current TGT) |
 | `BofRoast` | Upstream | `cube0x0/BofRoast` |
 | `tgtdelegation` | Upstream | `connormcgarr/tgtdelegation` |
 | `Klist` | Native | `bof-klist` |
@@ -168,6 +173,8 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `Timeroast-BOF` | Upstream | `Udayveer17/Timeroast-BOF` |
 | `purpleranges/bofs (gmsa-readpwd)` | Upstream | `purpleranges/bofs` |
 | `tgt-monitor-bof` | Upstream | `jakobfriedl/...` |
+| `spnroast` | Native | `bof-spnroast` (SSPI TGS request -> hashcat 13100/19600/19700) |
+| `asreproast` | Native | `bof-asreproast` (finds `DONT_REQ_PREAUTH` accounts) |
 
 ## 📜 ADCS (Certificate Services) Attacks
 
@@ -203,6 +210,11 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `Vipere (lpe_vs_bootstrap_bof)` | Upstream | `0xaled/Vipere` |
 | `BadTakeover-BOF` | Upstream | `logangoins/...` |
 | `Set-Password-Auth-BOF` | Upstream | `0xGunrunner/...` |
+| `make_token` | Native | `bof-maketoken` (plaintext logon + impersonation) |
+| `steal_token` | Native | `bof-stealtoken` (duplicate a process token) |
+| `revert_token` | Native | `bof-reverttoken` (`RevertToSelf`) |
+| `list_impersonation` | Native | `bof-listimpersonation` |
+| `getsystem-svc` | Native (partial) | `bof-getsystem-svc` (named-pipe impersonation server half) |
 
 ## 🚶 Lateral Movement
 
@@ -218,6 +230,11 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `StartWebClient` | Native | `bof-startwebclient` (`svcctl start WebClient`) |
 | `make_token_cert` | Upstream | trustedsec/CS-Remote-OPs-BOF |
 | `netuse_add` | Native | `bof-netuse` |
+| `smbexec` | Native | `bof-smbexec` (temporary SCM service) |
+| `wmiexec` | Native | `bof-wmiexec` (`Win32_Process::Create`) |
+| `dcomexec` | Native | `bof-dcomexec` (Shell.Application DCOM) |
+| `scshell` | Native | `bof-scshell` (reconfigure an existing service) |
+| `winrm-exec` | Native (partial) | `bof-winrm-exec` (drives `winrs.exe`; no native WS-Man stack) |
 
 ## 💉 Code Injection & In-Memory Execution
 
@@ -234,6 +251,10 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `BOF_RunPe` | Upstream | `NtDallas/BOF_RunPe` |
 | `BOF_Spawn` | Upstream | `NtDallas/BOF_Spawn` |
 | `shellwindows-BOF` | Upstream | `Beautifu1Boy-Official/...` |
+| `APC injection` | Native | `bof-injectapc` (queue user APC) |
+| `NtCreateThreadEx injection` | Native | `bof-injectthread` |
+| `EarlyBird` | Native | `bof-earlybird` (APC before entry point) |
+| `GhostWrite` | Native | `bof-ghostwrite` (section-backed write) |
 
 ## 🕵️ Defense Evasion
 
@@ -252,11 +273,16 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `SafeHarbor-BOF` | Native (partial) | `bof-safeharbor (heuristic)` |
 | `SilentHarbor-BOF` | Upstream | `ibaiC/SilentHarbor-BOF` |
 | `DllComHijacking` | Upstream | REDMED-X/OperatorsKit |
-| `DllEnvHijacking` | Upstream | REDMED-X/OperatorsKit |
+| `DllEnvHijacking` | Native (partial) | `bof-dllhijack` (service/AppInit writable-dir scan) |
 | `VulnDriverScan-BOF` | Native | `bof-vulndrivers` |
 | `EnumRWX` | Native | `bof-enumrwx` |
 | `ClearEventlogBOF` | Native | `bof-cleareventlog` |
 | `HideFile` | Native | `bof-hidefile` |
+| `ppidspoof` | Native | `bof-ppidspoof` (parent-process attribute) |
+| `blockdlls` | Native | `bof-blockdlls` (non-Microsoft DLL mitigation) |
+| `acldeny` | Native | `bof-acldeny` (deny ACE on a file or key) |
+| `timestomp` | Native | `bof-timestomp` (`SetFileTime`; MFT `$FILE_NAME` unchanged) |
+| `schtaskshide` | Native | `bof-schtaskshide` (deny Users read on a task) |
 
 ## 💾 Persistence
 
@@ -288,19 +314,25 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `ndur0/bofs (dcsync)` | Upstream | `ndur0/bofs` |
 | `SQL-BOF` | Upstream | `Tw1sm/SQL-BOF` |
 | `EnumDotnet` | Native | `bof-enumdotnet` |
+| `gpocheck` | Native | `bof-gpocheck` (GPO links + GPP `cpassword` decrypt) |
+| `trustdump` | Native | `bof-trustdump` (`DsEnumerateDomainTrusts`) |
 
 ## 🧰 Utility & Intel Gathering
 
 | Catalog BOF | Status | This kit / upstream |
 |---|---|---|
-| `KeyloggerRawInput` | Upstream | REDMED-X/OperatorsKit |
-| `Collection-BOF-Adaptix (keylogger)` | Upstream | `Loky-rt/Collection-BOF-Adaptix` |
+| `KeyloggerRawInput` | Native (partial) | `bof-keylogger` (duration-limited low-level hook) |
+| `Collection-BOF-Adaptix (keylogger)` | Native (partial) | `bof-keylogger` (duration-limited low-level hook) |
+| `screenspy` | Native | `bof-screenspy` (repeated BMP captures) |
+| `keylogger` | Native (partial) | `bof-keylogger` (duration-limited low-level hook) |
+| `browserhist` | Native | `bof-browserhist` (Chrome/Edge `History` SQLite) |
+| `findcreds` | Native (partial) | `bof-findcreds` (name/content heuristics) |
 | `ScreenshotBOF` | Native | `bof-screenshot` |
 | `GeoLocation_BOF` | Native (partial) | `bof-geolocation (region/timezone, not location bof-services)` |
-| `msi-search` | Upstream | Mandiant |
+| `msi-search` | Native | `bof-msi-search` |
 | `evtxsearch-bof` | Native | `bof-evtxsearch` |
 | `EnumFiles` | Native | `bof-enumfiles` |
-| `ChromeHistory_bof` | Upstream | `mabangde/...` |
+| `ChromeHistory_bof` | Native | `bof-browserhist` |
 | `EnumDrives` | Native | `bof-drives` |
 | `Zip-BOF` | Upstream | `rubyattack3r/Zip-BOF` |
 | `Zipper-BOF` | Upstream | `An0nUD4Y/Zipper-BOF` |
@@ -308,6 +340,10 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `EnumHandles` | Native | `bof-EnumHandles` (`bof-enumhandles`) |
 | `ProcessListHandles` | Native | `bof-ProcessListHandles` (`bof-processhandles`) |
 | `ProcessDestroy` | Upstream | trustedsec/CS-Remote-OPs-BOF |
+| `selfdelete` | Native | `bof-selfdelete` (reboot/helper strategies) |
+| `prefetchdel` | Native | `bof-prefetchdel` (delete `.pf` traces) |
+| `threadhide` | Native | `bof-threadhide` (`ThreadHideFromDebugger`) |
+| `clearmplog` | Native | `bof-clearmplog` (Defender event logs) |
 | `EnumLib` | Native | `bof-listmods` |
 | `proctools` | Native (partial) | `bof-proclist` |
 | `cs_DriverQuery` | Native | `bof-drivers` |
@@ -321,7 +357,7 @@ Summary: **114 native**, **18 partially native**, **109 upstream-only**.
 | `DCSync-Bof` | Upstream | `P0142/DCSync-Bof` |
 | `LSAdump-BOF` | Upstream | `shashinma/LSAdump-BOF` |
 | `NBTscan-BOF` | Native | `bof-nbtscan` |
-| `VaultDumpBOF` | Upstream | `MeirV2-2/VaultDumpBOF` |
+| `VaultDumpBOF` | Native (partial) | `bof-vaultdump` (enumerates items; protected data not decrypted) |
 | `Ada-PoisonKiller-BOF` | Upstream | `JohnRyk/...` |
 | `LSAWhisperer-BOF` | Upstream | `Art-Fakt/...` |
 | `AdaptixBOFs (DNS)` | Upstream | `ADHDMurky/AdaptixBOFs` |

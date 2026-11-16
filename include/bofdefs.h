@@ -49,6 +49,12 @@
 #include <vss.h>
 #include <vsbackup.h>
 #include <fwpmu.h>
+#include <wintrust.h>
+#include <softpub.h>
+#include <wbemcli.h>
+#include <msi.h>
+#include <sspi.h>
+#include <dsgetdc.h>
 
 /* DNS client cache (not declared by the MinGW headers we target). */
 typedef struct _DNS_CACHE_ENTRY {
@@ -99,11 +105,13 @@ DECLSPEC_IMPORT UINT    WINAPI KERNEL32$GetDriveTypeA(LPCSTR);
 DECLSPEC_IMPORT BOOL    WINAPI KERNEL32$GetDiskFreeSpaceExA(LPCSTR, PULARGE_INTEGER, PULARGE_INTEGER, PULARGE_INTEGER);
 DECLSPEC_IMPORT LPSTR   WINAPI KERNEL32$GetEnvironmentStringsA(void);
 DECLSPEC_IMPORT BOOL    WINAPI KERNEL32$FreeEnvironmentStringsA(LPSTR);
+DECLSPEC_IMPORT DWORD   WINAPI KERNEL32$ExpandEnvironmentStringsA(LPCSTR, LPSTR, DWORD);
 DECLSPEC_IMPORT BOOL    WINAPI KERNEL32$GetComputerNameExA(COMPUTER_NAME_FORMAT, LPSTR, LPDWORD);
 DECLSPEC_IMPORT int     WINAPI KERNEL32$WideCharToMultiByte(UINT, DWORD, LPCWCH, int, LPSTR, int, LPCCH, LPBOOL);
 DECLSPEC_IMPORT int     WINAPI KERNEL32$MultiByteToWideChar(UINT, DWORD, LPCCH, int, LPWSTR, int);
 DECLSPEC_IMPORT VOID    WINAPI KERNEL32$GetSystemTimeAsFileTime(LPFILETIME);
 DECLSPEC_IMPORT VOID    WINAPI KERNEL32$GetSystemTime(LPSYSTEMTIME);
+DECLSPEC_IMPORT VOID    WINAPI KERNEL32$GetLocalTime(LPSYSTEMTIME);
 DECLSPEC_IMPORT ULONGLONG WINAPI KERNEL32$GetTickCount64(void);
 DECLSPEC_IMPORT BOOL    WINAPI KERNEL32$FileTimeToSystemTime(const FILETIME *, LPSYSTEMTIME);
 DECLSPEC_IMPORT BOOL    WINAPI KERNEL32$GlobalMemoryStatusEx(LPMEMORYSTATUSEX);
@@ -134,6 +142,7 @@ DECLSPEC_IMPORT PUCHAR WINAPI ADVAPI32$GetSidSubAuthorityCount(PSID);
 DECLSPEC_IMPORT PDWORD WINAPI ADVAPI32$GetSidSubAuthority(PSID, DWORD);
 DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$LookupAccountSidA(LPCSTR, PSID, LPSTR, LPDWORD, LPSTR, LPDWORD, PSID_NAME_USE);
 DECLSPEC_IMPORT HLOCAL WINAPI KERNEL32$LocalFree(HLOCAL);
+DECLSPEC_IMPORT HLOCAL WINAPI KERNEL32$LocalAlloc(UINT, SIZE_T);
 
 DECLSPEC_IMPORT LONG WINAPI ADVAPI32$RegOpenKeyExA(HKEY, LPCSTR, DWORD, REGSAM, PHKEY);
 DECLSPEC_IMPORT LONG WINAPI ADVAPI32$RegCreateKeyExA(HKEY, LPCSTR, DWORD, LPSTR, DWORD, REGSAM, LPSECURITY_ATTRIBUTES, PHKEY, LPDWORD);
@@ -168,6 +177,8 @@ DECLSPEC_IMPORT DWORD WINAPI IPHLPAPI$GetIpNetTable(PMIB_IPNETTABLE, PULONG, BOO
 DECLSPEC_IMPORT DWORD WINAPI IPHLPAPI$GetTcpTable(PMIB_TCPTABLE, PULONG, BOOL);
 DECLSPEC_IMPORT DWORD WINAPI IPHLPAPI$GetUdpTable(PMIB_UDPTABLE, PULONG, BOOL);
 DECLSPEC_IMPORT DWORD WINAPI IPHLPAPI$GetIpForwardTable(PMIB_IPFORWARDTABLE, PULONG, BOOL);
+DECLSPEC_IMPORT DWORD WINAPI IPHLPAPI$GetExtendedTcpTable(PVOID, PDWORD, BOOL, ULONG, TCP_TABLE_CLASS, ULONG);
+DECLSPEC_IMPORT DWORD WINAPI IPHLPAPI$GetExtendedUdpTable(PVOID, PDWORD, BOOL, ULONG, UDP_TABLE_CLASS, ULONG);
 
 /* ------------------------------------------------------------------ */
 /* netapi32                                                            */
@@ -410,11 +421,33 @@ DECLSPEC_IMPORT BOOL WINAPI VERSION$GetFileVersionInfoA(LPCSTR, DWORD, DWORD, LP
 DECLSPEC_IMPORT BOOL WINAPI VERSION$VerQueryValueA(LPCVOID, LPCSTR, LPVOID *, PUINT);
 
 /* ------------------------------------------------------------------ */
+/* wintrust / crypt32 (driver signatures)                              */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT LONG WINAPI WINTRUST$WinVerifyTrust(HWND, GUID *, LPVOID);
+DECLSPEC_IMPORT BOOL WINAPI CRYPT32$CryptQueryObject(DWORD, const void *, DWORD, DWORD,
+                                                     DWORD, DWORD *, DWORD *, DWORD *,
+                                                     HCERTSTORE *, HCRYPTMSG *, const void **);
+DECLSPEC_IMPORT BOOL WINAPI CRYPT32$CryptMsgGetParam(HCRYPTMSG, DWORD, DWORD, void *, DWORD *);
+DECLSPEC_IMPORT BOOL WINAPI CRYPT32$CryptMsgClose(HCRYPTMSG);
+DECLSPEC_IMPORT PCCERT_CONTEXT WINAPI CRYPT32$CertFindCertificateInStore(HCERTSTORE, DWORD,
+                                                                          DWORD, DWORD,
+                                                                          const void *,
+                                                                          PCCERT_CONTEXT);
+
+/* ------------------------------------------------------------------ */
+/* msi (installed products)                                            */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT UINT WINAPI MSI$MsiEnumProductsA(DWORD, LPSTR);
+DECLSPEC_IMPORT UINT WINAPI MSI$MsiGetProductInfoA(LPCSTR, LPCSTR, LPSTR, LPDWORD);
+
+/* ------------------------------------------------------------------ */
 /* COM (ole32 / oleaut32)                                              */
 /* ------------------------------------------------------------------ */
 DECLSPEC_IMPORT HRESULT WINAPI OLE32$CoInitializeEx(LPVOID, DWORD);
 DECLSPEC_IMPORT void    WINAPI OLE32$CoUninitialize(void);
 DECLSPEC_IMPORT HRESULT WINAPI OLE32$CoCreateInstance(const GUID *, LPUNKNOWN, DWORD, const GUID *, LPVOID *);
+DECLSPEC_IMPORT HRESULT WINAPI OLE32$CoSetProxyBlanket(IUnknown *, DWORD, DWORD, OLECHAR *,
+                                                       DWORD, DWORD, void *, DWORD);
 DECLSPEC_IMPORT void    WINAPI OLE32$CoTaskMemFree(LPVOID);
 DECLSPEC_IMPORT HRESULT WINAPI OLE32$CoCreateGuid(GUID *);
 DECLSPEC_IMPORT BSTR    WINAPI OLEAUT32$SysAllocString(const OLECHAR *);
@@ -422,6 +455,10 @@ DECLSPEC_IMPORT void    WINAPI OLEAUT32$SysFreeString(BSTR);
 DECLSPEC_IMPORT UINT    WINAPI OLEAUT32$SysStringLen(BSTR);
 DECLSPEC_IMPORT void    WINAPI OLEAUT32$VariantInit(VARIANT *);
 DECLSPEC_IMPORT HRESULT WINAPI OLEAUT32$VariantClear(VARIANT *);
+DECLSPEC_IMPORT HRESULT WINAPI OLEAUT32$SafeArrayGetLBound(SAFEARRAY *, UINT, LONG *);
+DECLSPEC_IMPORT HRESULT WINAPI OLEAUT32$SafeArrayGetUBound(SAFEARRAY *, UINT, LONG *);
+DECLSPEC_IMPORT HRESULT WINAPI OLEAUT32$SafeArrayGetElement(SAFEARRAY *, LONG *, void *);
+DECLSPEC_IMPORT HRESULT WINAPI OLEAUT32$SafeArrayDestroy(SAFEARRAY *);
 
 /* ------------------------------------------------------------------ */
 /* more kernel32                                                       */
@@ -432,6 +469,7 @@ DECLSPEC_IMPORT int     WINAPI KERNEL32$GetGeoInfoA(GEOID, GEOTYPE, LPSTR, int, 
 DECLSPEC_IMPORT BOOL    WINAPI KERNEL32$GetProcessHandleCount(HANDLE, PDWORD);
 DECLSPEC_IMPORT BOOL    WINAPI KERNEL32$TerminateProcess(HANDLE, UINT);
 DECLSPEC_IMPORT NTSTATUS WINAPI NTDLL$NtQuerySystemInformation(ULONG, PVOID, ULONG, PULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI NTDLL$NtQueryInformationProcess(HANDLE, ULONG, PVOID, ULONG, PULONG);
 
 /* ------------------------------------------------------------------ */
 /* more advapi32 / crypt32 / wts                                       */
@@ -464,6 +502,160 @@ DECLSPEC_IMPORT DWORD WINAPI FWPUCLNT$FwpmSubLayerCreateEnumHandle0(HANDLE, cons
 DECLSPEC_IMPORT DWORD WINAPI FWPUCLNT$FwpmSubLayerEnum0(HANDLE, HANDLE, UINT32, FWPM_SUBLAYER0 ***, UINT32 *);
 DECLSPEC_IMPORT DWORD WINAPI FWPUCLNT$FwpmSubLayerDestroyEnumHandle0(HANDLE, HANDLE);
 DECLSPEC_IMPORT void  WINAPI FWPUCLNT$FwpmFreeMemory0(void **);
+
+/* ------------------------------------------------------------------ */
+/* lateral movement, spawning, timing                                  */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT VOID   WINAPI KERNEL32$Sleep(DWORD);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$CreateProcessA(LPCSTR, LPSTR, LPSECURITY_ATTRIBUTES, LPSECURITY_ATTRIBUTES, BOOL, DWORD, LPVOID, LPCSTR, LPSTARTUPINFOA, LPPROCESS_INFORMATION);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$GetExitCodeProcess(HANDLE, LPDWORD);
+DECLSPEC_IMPORT HANDLE WINAPI KERNEL32$GetCurrentThread(void);
+DECLSPEC_IMPORT DWORD  WINAPI KERNEL32$GetCurrentThreadId(void);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$SetFileTime(HANDLE, const FILETIME *, const FILETIME *, const FILETIME *);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$GetFileTime(HANDLE, LPFILETIME, LPFILETIME, LPFILETIME);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$SystemTimeToFileTime(const SYSTEMTIME *, LPFILETIME);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$LocalFileTimeToFileTime(const FILETIME *, LPFILETIME);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$MoveFileExA(LPCSTR, LPCSTR, DWORD);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$DeleteFileA(LPCSTR);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$CopyFileA(LPCSTR, LPCSTR, BOOL);
+DECLSPEC_IMPORT DWORD  WINAPI KERNEL32$QueueUserAPC(PAPCFUNC, HANDLE, ULONG_PTR);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$InitializeProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST, DWORD, DWORD, PSIZE_T);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$UpdateProcThreadAttribute(LPPROC_THREAD_ATTRIBUTE_LIST, DWORD, DWORD_PTR, PVOID, SIZE_T, PVOID, PSIZE_T);
+DECLSPEC_IMPORT VOID   WINAPI KERNEL32$DeleteProcThreadAttributeList(LPPROC_THREAD_ATTRIBUTE_LIST);
+DECLSPEC_IMPORT HANDLE WINAPI KERNEL32$CreateNamedPipeA(LPCSTR, DWORD, DWORD, DWORD, DWORD, DWORD, DWORD, LPSECURITY_ATTRIBUTES);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$ConnectNamedPipe(HANDLE, LPOVERLAPPED);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$DisconnectNamedPipe(HANDLE);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$CreatePipe(PHANDLE, PHANDLE, LPSECURITY_ATTRIBUTES, DWORD);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$PeekNamedPipe(HANDLE, LPVOID, DWORD, LPDWORD, LPDWORD, LPDWORD);
+DECLSPEC_IMPORT HANDLE WINAPI KERNEL32$CreateEventA(LPSECURITY_ATTRIBUTES, BOOL, BOOL, LPCSTR);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$CreateDirectoryA(LPCSTR, LPSECURITY_ATTRIBUTES);
+
+/* ------------------------------------------------------------------ */
+/* tokens / impersonation / ACLs                                       */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$ImpersonateNamedPipeClient(HANDLE);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$LogonUserA(LPCSTR, LPCSTR, LPCSTR, DWORD, DWORD, PHANDLE);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$ImpersonateLoggedOnUser(HANDLE);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$RevertToSelf(void);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$OpenThreadToken(HANDLE, DWORD, BOOL, PHANDLE);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$CreateWellKnownSid(WELL_KNOWN_SID_TYPE, PSID, PSID, DWORD *);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$LookupAccountNameA(LPCSTR, LPCSTR, PSID, LPDWORD, LPSTR, LPDWORD, PSID_NAME_USE);
+DECLSPEC_IMPORT DWORD WINAPI ADVAPI32$SetEntriesInAclA(ULONG, PEXPLICIT_ACCESS_A, PACL, PACL *);
+DECLSPEC_IMPORT DWORD WINAPI ADVAPI32$SetNamedSecurityInfoA(LPSTR, SE_OBJECT_TYPE, SECURITY_INFORMATION, PSID, PSID, PACL, PACL);
+DECLSPEC_IMPORT DWORD WINAPI ADVAPI32$GetSecurityInfo(HANDLE, SE_OBJECT_TYPE, SECURITY_INFORMATION, PSID *, PSID *, PACL *, PACL *, PSECURITY_DESCRIPTOR *);
+DECLSPEC_IMPORT DWORD WINAPI ADVAPI32$SetSecurityInfo(HANDLE, SE_OBJECT_TYPE, SECURITY_INFORMATION, PSID, PSID, PACL, PACL);
+
+/* ------------------------------------------------------------------ */
+/* ntdll: thread / section primitives                                  */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT NTSTATUS WINAPI NTDLL$NtCreateThreadEx(PHANDLE, ACCESS_MASK, PVOID, HANDLE, PVOID, PVOID, ULONG, SIZE_T, SIZE_T, SIZE_T, PVOID);
+DECLSPEC_IMPORT NTSTATUS WINAPI NTDLL$NtCreateSection(PHANDLE, ACCESS_MASK, PVOID, PLARGE_INTEGER, ULONG, ULONG, HANDLE);
+DECLSPEC_IMPORT NTSTATUS WINAPI NTDLL$NtMapViewOfSection(HANDLE, HANDLE, PVOID *, ULONG_PTR, SIZE_T, PLARGE_INTEGER, PSIZE_T, ULONG, ULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI NTDLL$NtUnmapViewOfSection(HANDLE, PVOID);
+DECLSPEC_IMPORT NTSTATUS WINAPI NTDLL$NtClose(HANDLE);
+DECLSPEC_IMPORT NTSTATUS WINAPI NTDLL$NtSetInformationThread(HANDLE, ULONG, PVOID, ULONG);
+
+/* ------------------------------------------------------------------ */
+/* sspi (native Kerberoasting)                                         */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT SECURITY_STATUS WINAPI SECUR32$AcquireCredentialsHandleA(LPSTR, LPSTR, ULONG, PLUID, PVOID, SEC_GET_KEY_FN, PVOID, PCredHandle, PTimeStamp);
+DECLSPEC_IMPORT SECURITY_STATUS WINAPI SECUR32$InitializeSecurityContextA(PCredHandle, PCtxtHandle, LPSTR, ULONG, ULONG, ULONG, PSecBufferDesc, ULONG, PCtxtHandle, PSecBufferDesc, PULONG, PTimeStamp);
+DECLSPEC_IMPORT SECURITY_STATUS WINAPI SECUR32$FreeContextBuffer(PVOID);
+DECLSPEC_IMPORT SECURITY_STATUS WINAPI SECUR32$DeleteSecurityContext(PCtxtHandle);
+DECLSPEC_IMPORT SECURITY_STATUS WINAPI SECUR32$FreeCredentialsHandle(PCredHandle);
+
+/* ------------------------------------------------------------------ */
+/* crypt32 DPAPI / bcrypt AES / netapi trusts / winevt / vault          */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT BOOL     WINAPI CRYPT32$CryptUnprotectData(DATA_BLOB *, LPWSTR *, DATA_BLOB *, DATA_BLOB *, PVOID, DWORD, DATA_BLOB *);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptSetProperty(BCRYPT_HANDLE, LPCWSTR, PUCHAR, ULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptGetProperty(BCRYPT_HANDLE, LPCWSTR, PUCHAR, ULONG, PULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptOpenAlgorithmProvider(BCRYPT_ALG_HANDLE *, LPCWSTR, LPCWSTR, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptCloseAlgorithmProvider(BCRYPT_ALG_HANDLE, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptCreateHash(BCRYPT_ALG_HANDLE, BCRYPT_HASH_HANDLE *, PUCHAR, ULONG, PUCHAR, ULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptHashData(BCRYPT_HASH_HANDLE, PUCHAR, ULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptFinishHash(BCRYPT_HASH_HANDLE, PUCHAR, ULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptDestroyHash(BCRYPT_HASH_HANDLE);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptGenerateSymmetricKey(BCRYPT_ALG_HANDLE, BCRYPT_KEY_HANDLE *, PUCHAR, ULONG, PUCHAR, ULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptDecrypt(BCRYPT_KEY_HANDLE, PUCHAR, ULONG, PVOID, PUCHAR, ULONG, PUCHAR, ULONG, PULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptDestroyKey(BCRYPT_KEY_HANDLE);
+DECLSPEC_IMPORT DWORD    WINAPI NETAPI32$DsEnumerateDomainTrustsA(LPSTR, ULONG, PDS_DOMAIN_TRUSTSA *, PULONG);
+DECLSPEC_IMPORT BOOL     WINAPI WEVTAPI$EvtClearLog(EVT_HANDLE, LPCWSTR, LPCWSTR, DWORD);
+
+DECLSPEC_IMPORT DWORD WINAPI VAULTCLI$VaultEnumerateVaults(DWORD, int *, GUID ***);
+DECLSPEC_IMPORT DWORD WINAPI VAULTCLI$VaultOpenVault(const GUID *, DWORD, PHANDLE);
+DECLSPEC_IMPORT DWORD WINAPI VAULTCLI$VaultEnumerateItems(HANDLE, DWORD, int *, PVOID *);
+DECLSPEC_IMPORT DWORD WINAPI VAULTCLI$VaultCloseVault(HANDLE *);
+DECLSPEC_IMPORT DWORD WINAPI VAULTCLI$VaultFree(PVOID);
+
+/* COM: remote activation (WMI / DCOM lateral movement) */
+DECLSPEC_IMPORT HRESULT WINAPI OLE32$CoCreateInstanceEx(const GUID *, LPUNKNOWN, DWORD, COSERVERINFO *, ULONG, MULTI_QI *);
+DECLSPEC_IMPORT HRESULT WINAPI OLE32$CoInitializeSecurity(PSECURITY_DESCRIPTOR, LONG, SOLE_AUTHENTICATION_SERVICE *, PVOID, DWORD, DWORD, PVOID, DWORD, PVOID);
+
+/* user32: low-level keyboard hook */
+DECLSPEC_IMPORT HHOOK   WINAPI USER32$SetWindowsHookExA(int, HOOKPROC, HINSTANCE, DWORD);
+DECLSPEC_IMPORT BOOL    WINAPI USER32$UnhookWindowsHookEx(HHOOK);
+DECLSPEC_IMPORT LRESULT WINAPI USER32$CallNextHookEx(HHOOK, int, WPARAM, LPARAM);
+DECLSPEC_IMPORT BOOL    WINAPI USER32$PeekMessageA(LPMSG, HWND, UINT, UINT, UINT);
+DECLSPEC_IMPORT BOOL    WINAPI USER32$TranslateMessage(const MSG *);
+DECLSPEC_IMPORT LRESULT WINAPI USER32$DispatchMessageA(const MSG *);
+DECLSPEC_IMPORT SHORT   WINAPI USER32$GetKeyState(int);
+DECLSPEC_IMPORT UINT    WINAPI USER32$MapVirtualKeyA(UINT, UINT);
+DECLSPEC_IMPORT int     WINAPI USER32$GetKeyNameTextA(LONG, LPSTR, int);
+
+/* ------------------------------------------------------------------ */
+/* Vault API element layout (vaultcli.h is not shipped by MinGW)        */
+/* ------------------------------------------------------------------ */
+typedef enum _BOF_VAULT_ELEMENT_TYPE {
+    BOF_VaultElementType_Boolean = 0,
+    BOF_VaultElementType_Short,
+    BOF_VaultElementType_UnsignedShort,
+    BOF_VaultElementType_Int,
+    BOF_VaultElementType_UnsignedInt,
+    BOF_VaultElementType_Long,
+    BOF_VaultElementType_UnsignedLong,
+    BOF_VaultElementType_String,
+    BOF_VaultElementType_BooleanArray,
+    BOF_VaultElementType_ShortArray,
+    BOF_VaultElementType_UnsignedShortArray,
+    BOF_VaultElementType_IntArray,
+    BOF_VaultElementType_UnsignedIntArray,
+    BOF_VaultElementType_LongArray,
+    BOF_VaultElementType_UnsignedLongArray,
+    BOF_VaultElementType_ByteArray,
+    BOF_VaultElementType_ProtectedArray,
+    BOF_VaultElementType_Attribute,
+    BOF_VaultElementType_Sid,
+} BOF_VAULT_ELEMENT_TYPE;
+
+typedef struct _BOF_VAULT_ITEM_ELEMENT {
+    BOF_VAULT_ELEMENT_TYPE Type;
+    union {
+        BOOLEAN Boolean;
+        SHORT   Short;
+        USHORT  UnsignedShort;
+        INT     Int;
+        UINT    UnsignedInt;
+        LONG    Long;
+        ULONG   UnsignedLong;
+        LPWSTR  String;
+        struct { DWORD size; PBYTE data; } ByteArray;
+    } Value;
+} BOF_VAULT_ITEM_ELEMENT, *PBOF_VAULT_ITEM_ELEMENT;
+
+/* VAULT_ITEM_7/8 share this layout for enumeration on x64. */
+typedef struct _BOF_VAULT_ITEM {
+    GUID SchemaId;
+    DWORD_PTR FriendlyName;
+    DWORD_PTR Resource;
+    DWORD_PTR Identity;
+    DWORD_PTR PackageSid;
+    PBOF_VAULT_ITEM_ELEMENT ResourceElement;
+    PBOF_VAULT_ITEM_ELEMENT IdentityElement;
+    PBOF_VAULT_ITEM_ELEMENT PackageSidElement;
+    FILETIME LastModified;
+    DWORD Flags;
+} BOF_VAULT_ITEM, *PBOF_VAULT_ITEM;
 
 /* ------------------------------------------------------------------ */
 /* NT handle table (SystemHandleInformation)                           */

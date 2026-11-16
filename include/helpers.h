@@ -25,6 +25,36 @@ static inline int bof_wcslen(const wchar_t *s)
     return n;
 }
 
+static inline void bof_wcscpy(wchar_t *dst, const wchar_t *src)
+{
+    while ((*dst++ = *src++)) ;
+}
+
+static inline void bof_wcsncpy(wchar_t *dst, const wchar_t *src, int n)
+{
+    int i;
+    if (n <= 0) {
+        if (n == 0) dst[0] = 0;
+        return;
+    }
+    for (i = 0; i < n - 1 && src[i]; i++)
+        dst[i] = src[i];
+    dst[i] = 0;
+}
+
+static inline void bof_wcscat(wchar_t *dst, const wchar_t *src)
+{
+    while (*dst) dst++;
+    while ((*dst++ = *src++)) ;
+}
+
+static inline void bof_wcsncat(wchar_t *dst, const wchar_t *src, int n)
+{
+    while (*dst) dst++;
+    while (n-- > 0 && *src) *dst++ = *src++;
+    *dst = 0;
+}
+
 static inline void bof_memzero(void *p, unsigned int n)
 {
     unsigned char *b = (unsigned char *)p;
@@ -36,6 +66,17 @@ static inline void bof_memcpy(void *dst, const void *src, unsigned int n)
     unsigned char *d = (unsigned char *)dst;
     const unsigned char *s = (const unsigned char *)src;
     while (n--) *d++ = *s++;
+}
+
+static inline int bof_memcmp(const void *a, const void *b, unsigned int n)
+{
+    const unsigned char *x = (const unsigned char *)a;
+    const unsigned char *y = (const unsigned char *)b;
+    while (n--) {
+        if (*x != *y) return (int)*x - (int)*y;
+        x++; y++;
+    }
+    return 0;
 }
 
 static inline int bof_strcmp(const char *a, const char *b)
@@ -202,6 +243,198 @@ static inline void bof_trim(char *s)
     int n = bof_strlen(s);
     while (n > 0 && (s[n - 1] == ' ' || s[n - 1] == '\r' || s[n - 1] == '\n' || s[n - 1] == '\t'))
         s[--n] = 0;
+}
+
+/* FILETIME (100ns since 1601) -> "YYYY-MM-DD HH:MM:SS". */
+static inline void bof_ft_str(unsigned long long v, char *out, int outsz)
+{
+    FILETIME ft;
+    SYSTEMTIME st;
+    char t[24];
+    char *p = t;
+
+    ft.dwLowDateTime  = (DWORD)(v & 0xffffffffULL);
+    ft.dwHighDateTime = (DWORD)(v >> 32);
+    if (!KERNEL32$FileTimeToSystemTime(&ft, &st)) {
+        bof_strncpy(out, "?", outsz);
+        return;
+    }
+    *p++ = (char)('0' + (st.wYear / 1000) % 10);
+    *p++ = (char)('0' + (st.wYear / 100) % 10);
+    *p++ = (char)('0' + (st.wYear / 10) % 10);
+    *p++ = (char)('0' + st.wYear % 10);
+    *p++ = '-';
+    *p++ = (char)('0' + (st.wMonth / 10) % 10);
+    *p++ = (char)('0' + st.wMonth % 10);
+    *p++ = '-';
+    *p++ = (char)('0' + (st.wDay / 10) % 10);
+    *p++ = (char)('0' + st.wDay % 10);
+    *p++ = ' ';
+    *p++ = (char)('0' + (st.wHour / 10) % 10);
+    *p++ = (char)('0' + st.wHour % 10);
+    *p++ = ':';
+    *p++ = (char)('0' + (st.wMinute / 10) % 10);
+    *p++ = (char)('0' + st.wMinute % 10);
+    *p++ = ':';
+    *p++ = (char)('0' + (st.wSecond / 10) % 10);
+    *p++ = (char)('0' + st.wSecond % 10);
+    *p = 0;
+    bof_strncpy(out, t, outsz);
+}
+
+/* ---- base64 / hex ------------------------------------------------- */
+
+static inline int bof_b64_val(int c)
+{
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+' || c == '-') return 62;
+    if (c == '/' || c == '_') return 63;
+    return -1;
+}
+
+/* Returns base64 length, or -1 if it does not fit. Always NUL-terminates. */
+static inline int bof_b64_encode(const unsigned char *src, int slen, char *dst, int dlen)
+{
+    static const char tab[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    int i, o = 0;
+
+    if (dlen <= 0) return -1;
+    for (i = 0; i + 2 < slen; i += 3) {
+        unsigned v = ((unsigned)src[i] << 16) | ((unsigned)src[i + 1] << 8) | src[i + 2];
+        if (o + 4 >= dlen) { dst[o] = 0; return -1; }
+        dst[o++] = tab[(v >> 18) & 63];
+        dst[o++] = tab[(v >> 12) & 63];
+        dst[o++] = tab[(v >> 6) & 63];
+        dst[o++] = tab[v & 63];
+    }
+    if (i < slen) {
+        unsigned v = (unsigned)src[i] << 16;
+        if (i + 1 < slen) v |= (unsigned)src[i + 1] << 8;
+        if (o + 4 >= dlen) { dst[o] = 0; return -1; }
+        dst[o++] = tab[(v >> 18) & 63];
+        dst[o++] = tab[(v >> 12) & 63];
+        dst[o++] = (i + 1 < slen) ? tab[(v >> 6) & 63] : '=';
+        dst[o++] = '=';
+    }
+    dst[o] = 0;
+    return o;
+}
+
+/* Decodes base64, skipping whitespace. Returns byte count or -1. */
+static inline int bof_b64_decode(const char *src, unsigned char *dst, int dlen)
+{
+    int i, o = 0, quad = 0;
+    unsigned acc = 0;
+
+    if (!src || dlen <= 0) return -1;
+    for (i = 0; src[i]; i++) {
+        int c = (unsigned char)src[i];
+        int v;
+        if (c == '=' ) break;
+        if (c == ' ' || c == '\r' || c == '\n' || c == '\t') continue;
+        v = bof_b64_val(c);
+        if (v < 0) return -1;
+        acc = (acc << 6) | (unsigned)v;
+        quad++;
+        if (quad == 4) {
+            if (o + 3 > dlen) return -1;
+            dst[o++] = (unsigned char)((acc >> 16) & 0xff);
+            dst[o++] = (unsigned char)((acc >> 8) & 0xff);
+            dst[o++] = (unsigned char)(acc & 0xff);
+            acc = 0;
+            quad = 0;
+        }
+    }
+    if (quad == 2) {
+        if (o + 1 > dlen) return -1;
+        dst[o++] = (unsigned char)((acc >> 4) & 0xff);
+    } else if (quad == 3) {
+        if (o + 2 > dlen) return -1;
+        dst[o++] = (unsigned char)((acc >> 10) & 0xff);
+        dst[o++] = (unsigned char)((acc >> 2) & 0xff);
+    } else if (quad != 0) {
+        return -1;
+    }
+    return o;
+}
+
+static inline int bof_hexval(int c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+/* Decodes hex (optional 0x prefix, spaces/colons ignored). */
+static inline int bof_hex_decode(const char *src, unsigned char *dst, int dlen)
+{
+    int o = 0, hi = -1;
+    if (!src || dlen <= 0) return -1;
+    if (src[0] == '0' && (src[1] == 'x' || src[1] == 'X')) src += 2;
+    while (*src) {
+        int v;
+        if (*src == ' ' || *src == ':' || *src == '-' || *src == '\r' || *src == '\n') { src++; continue; }
+        v = bof_hexval((unsigned char)*src++);
+        if (v < 0) return -1;
+        if (hi < 0) { hi = v; continue; }
+        if (o >= dlen) return -1;
+        dst[o++] = (unsigned char)((hi << 4) | v);
+        hi = -1;
+    }
+    return (hi < 0) ? o : -1;
+}
+
+/* Reads a file into RW VirtualAlloc memory. 0 on success. */
+static inline int bof_read_file(const char *path, unsigned char **out, unsigned int *outsz)
+{
+    HANDLE h;
+    LARGE_INTEGER sz;
+    DWORD got = 0;
+    unsigned char *p;
+
+    *out = NULL;
+    *outsz = 0;
+    if (!path || !path[0]) return -1;
+
+    h = KERNEL32$CreateFileA(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                             NULL, OPEN_EXISTING, 0, NULL);
+    if (h == INVALID_HANDLE_VALUE) return -1;
+    if (!KERNEL32$GetFileSizeEx(h, &sz) || sz.QuadPart <= 0 ||
+        sz.QuadPart > (LONGLONG)0x10000000) {
+        KERNEL32$CloseHandle(h);
+        return -1;
+    }
+    p = (unsigned char *)KERNEL32$VirtualAlloc(NULL, (SIZE_T)sz.QuadPart,
+                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (!p) {
+        KERNEL32$CloseHandle(h);
+        return -1;
+    }
+    if (!KERNEL32$ReadFile(h, p, (DWORD)sz.QuadPart, &got, NULL) ||
+        got != (DWORD)sz.QuadPart) {
+        KERNEL32$VirtualFree(p, 0, MEM_RELEASE);
+        KERNEL32$CloseHandle(h);
+        return -1;
+    }
+    KERNEL32$CloseHandle(h);
+    *out = p;
+    *outsz = (unsigned int)sz.QuadPart;
+    return 0;
+}
+
+/* True when the pointer range is committed readable memory. */
+static inline int bof_mem_readable(const void *p)
+{
+    MEMORY_BASIC_INFORMATION mbi;
+    if (!p) return 0;
+    if (KERNEL32$VirtualQuery(p, &mbi, sizeof(mbi)) == 0) return 0;
+    if (mbi.State != MEM_COMMIT) return 0;
+    if (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD)) return 0;
+    return 1;
 }
 
 static inline HKEY bof_hive(const char *s)
