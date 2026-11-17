@@ -10,7 +10,7 @@ it.
   tool is still better for the full feature set.
 - **Upstream** — a separate, substantial project (license, size, or technique).
 
-Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows).
+Summary: **160 native**, **41 partially native**, **84 upstream-only** (285 rows).
 
 > Commands are shown with their `bof-` prefix. See `README.md` for arguments.
 >
@@ -20,7 +20,7 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 > `AddExclusion` and `DelExclusion`; `bof-svc-create`, `bof-sc-config`,
 > `bof-sc-start` and `bof-sc-stop` cover `SCCreate`, `SCConfig`, `SCStart`
 > and `SCStop`). The native row count below therefore is not the same as the
-> number of compiled objects (152 objects, 183 registered commands).
+> number of compiled objects (170 objects, 201 registered commands).
 
 ## 🔍 Reconnaissance & Situational Awareness
 
@@ -99,7 +99,7 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `ADWS-BOF` | Upstream | `e-fin/ADWS-BOF` |
 | `ScriptSentry-BOF` | Upstream | `An0nUD4Y/ScriptSentry-BOF` |
 | `AdaptixBOFs (DNS)` | Upstream | `ADHDMurky/AdaptixBOFs` |
-| `dnstool-bof` | Upstream | `slemire/dnstool-bof` |
+| `dnstool-bof` | Native (partial) | `bof-dnsdump` (AD-integrated zones over LDAP) |
 | `DNSRPC-BOF` | Upstream | `Paradoxis/DNSRPC-BOF` |
 | `EnumShares` | Native | `bof-netshares` |
 | `EnumSysmon` | Native | `bof-enumsysmon` |
@@ -124,17 +124,17 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `reg_save / BOF-RegSave` | Native | `bof-regsave` |
 | `RawHive` | Upstream | `nmht3t/RawHive` |
 | `UnderlayCopy_bof` | Upstream | `Muz1K1zuM/UnderlayCopy_bof` |
-| `LSAdump-BOF` | Upstream | `shashinma/LSAdump-BOF` |
-| `DCSync-Bof` | Upstream | `P0142/DCSync-Bof` |
-| `dcsync-bof` | Upstream | `kozmer/dcsync-bof` |
+| `LSAdump-BOF` | Native (partial) | `bof-lsasecrets` (LsaRetrievePrivateData; no offline hive parsing) |
+| `DCSync-Bof` | Native (partial) | `bof-dacledit dcsync` (writes replication ACEs; replication itself upstream) |
+| `dcsync-bof` | Native (partial) | `bof-dacledit dcsync` (grants DCSync rights; replication itself upstream) |
 | `dumpguard_bof` | Upstream | `0xedh/dumpguard_bof` |
 | `CredManBOF` | Native | `bof-credman` |
-| `VaultDumpBOF` | Native (partial) | `bof-vaultdump` (enumerates items; protected data not decrypted) |
-| `DPAPI_BOF` | Upstream | `Bhanunamikaze/DPAPI_BOF` |
+| `VaultDumpBOF` | Native | `bof-vaultdump-full` (VaultGetItem authenticators) + `bof-vaultdump` (metadata) |
+| `DPAPI_BOF` | Native (partial) | `bof-dpapimasterkey` (password-based masterkey decrypt) |
 | `chryzsh/redteam-bofs` | Upstream | `chryzsh/redteam-bofs` |
 | `ChromeKatz` | Upstream | see bofs.md entry |
 | `EdgeDumper` | Upstream | `AlexLinov/Edge-Dumper` |
-| `chrome-abe-decryption-bof` | Upstream | `mendacus/...` |
+| `chrome-abe-decryption-bof` | Native (partial) | `bof-chromecreds-abe` (v10/v11 DPAPI, v20 APPB; ABE-protected entries reported) |
 | `firefoxdump` | Upstream | `mrrobot1o1/firefoxdump` |
 | `teams-cookies-bof` | Upstream | `TierZeroSecurity/...` |
 | `Cookie-Monster-BOF` | Upstream | `KingOfTheNOPs/cookie-monster` |
@@ -152,10 +152,10 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `get_azure_token` | Upstream | trustedsec/CS-Remote-OPs-BOF |
 | `BAADTokenBroker` | Upstream | `temp43487580/...` |
 | `dpapiblobdec` | Native | `bof-dpapiblobdec` (hex DPAPI blob) |
-| `chromecreds` | Native (partial) | `bof-chromecreds` (legacy DPAPI blobs; modern AES-GCM/ABE reported encrypted) |
-| `recentfiles` | Native (partial) | `bof-recentfiles` (Recent LNKs/`LinkInfo`; jump-list LNK streams not parsed) |
+| `chromecreds` | Native (partial) | `bof-chromecreds` (legacy DPAPI) + `bof-chromecreds-abe` (AES-GCM/app-bound) |
+| `recentfiles` | Native (partial) | `bof-recentfiles` (Recent LNKs, CFB jump-list LNK streams and DestList paths; IDList-only targets unresolved) |
 | `sshagentkeys` | Native (partial) | `bof-sshagentkeys` (public identities only; agent never exposes private keys) |
-| `vaultdump` | Native (partial) | `bof-vaultdump` (enumerate vault items; no decryption) |
+| `vaultdump` | Native (partial) | `bof-vaultdump` (metadata) + `bof-vaultdump-full` (authenticators) |
 
 ## 🎫 Kerberos Attacks
 
@@ -171,7 +171,7 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `SprayAD` | Upstream | outflanknl/C2-Tool-Collection |
 | `ESC1-unPAC` | Upstream | `RayRRT/ESC1-unPAC` |
 | `Timeroast-BOF` | Upstream | `Udayveer17/Timeroast-BOF` |
-| `purpleranges/bofs (gmsa-readpwd)` | Upstream | `purpleranges/bofs` |
+| `purpleranges/bofs (gmsa-readpwd)` | Native | `bof-groupmanagedpw` (MSDS_MANAGEDPASSWORD_BLOB -> NTLM) |
 | `tgt-monitor-bof` | Upstream | `jakobfriedl/...` |
 | `spnroast` | Native | `bof-spnroast` (SSPI TGS request -> hashcat 13100/19600/19700) |
 | `asreproast` | Native | `bof-asreproast` (finds `DONT_REQ_PREAUTH` accounts) |
@@ -187,7 +187,7 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `adcs_request_on_behalf` | Upstream | trustedsec/CS-Remote-OPs-BOF |
 | `CVE-2022-26923` | Upstream | outflanknl/C2-Tool-Collection |
 | `ESC1-unPAC` | Upstream | `RayRRT/ESC1-unPAC` |
-| `add-rbcd-bof-fix` | Upstream | `0xGunrunner/...` |
+| `add-rbcd-bof-fix` | Native | `bof-rbcd` (`msDS-AllowedToActOnBehalfOfOtherIdentity`) |
 | `OSEP-ENUM` | Native (partial) | `bof-ldapsearch (generic)` |
 
 ## 🔺 Privilege Escalation
@@ -195,9 +195,9 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | Catalog BOF | Status | This kit / upstream |
 |---|---|---|
 | `PrivKit` | Upstream | `mertdas/PrivKit` |
-| `UAC-BOF-Bonanza` | Upstream | `icyguider/UAC-BOF-Bonanza` |
+| `UAC-BOF-Bonanza` | Native (partial) | `bof-uacbypass` (HKCU ms-settings fodhelper/computerdefaults) |
 | `SigmaPotato-BOF` | Upstream | `m4rvxpn/SigmaPotato-BOF` |
-| `PrintSpoofer-BOF` | Upstream | `SlimeOnSecurity/...` |
+| `PrintSpoofer-BOF` | Native (partial) | `bof-printspoofer` (SpoolSS coercion + pipe impersonation) |
 | `GodPotatoBOF-Sliver` | Upstream | see bofs.md entry |
 | `EnableEFS` | Native | `bof-enableefs` |
 | `MS16-032-BOF` | Upstream | `curtishoughton/...` |
@@ -214,7 +214,7 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `steal_token` | Native | `bof-stealtoken` (duplicate a process token) |
 | `revert_token` | Native | `bof-reverttoken` (`RevertToSelf`) |
 | `list_impersonation` | Native | `bof-listimpersonation` |
-| `getsystem-svc` | Native (partial) | `bof-getsystem-svc` (named-pipe impersonation server half) |
+| `getsystem-svc` | Native (partial) | `bof-getsystem-svc` (pipe server + optional self-coercion; no SYSTEM command stage) |
 
 ## 🚶 Lateral Movement
 
@@ -234,7 +234,7 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `wmiexec` | Native | `bof-wmiexec` (`Win32_Process::Create`) |
 | `dcomexec` | Native | `bof-dcomexec` (Shell.Application DCOM) |
 | `scshell` | Native | `bof-scshell` (reconfigure an existing service) |
-| `winrm-exec` | Native (partial) | `bof-winrm-exec` (drives `winrs.exe`; no native WS-Man stack) |
+| `winrm-exec` | Native (partial) | `bof-winrm-exec` (native WS-Man over WinHTTP: Create/Command/Receive/Delete) |
 
 ## 💉 Code Injection & In-Memory Execution
 
@@ -283,6 +283,9 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `acldeny` | Native | `bof-acldeny` (deny ACE on a file or key) |
 | `timestomp` | Native | `bof-timestomp` (`SetFileTime`; MFT `$FILE_NAME` unchanged) |
 | `schtaskshide` | Native | `bof-schtaskshide` (deny Users read on a task) |
+| `patchwow64` | Native | `bof-patchwow64` (restore WOW64 module sections from disk) |
+| `handlestrip` | Native (partial) | `bof-handlestrip` (close foreign VM_READ handles; needs PROCESS_DUP_HANDLE) |
+| `aclprotect` | Native | `bof-aclprotect` (process DACL to SYSTEM; `restore` for NULL DACL) |
 
 ## 💾 Persistence
 
@@ -291,7 +294,7 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `AddTaskScheduler` | Native | `bof-AddTaskScheduler` (`schtasks create`) |
 | `DelTaskScheduler` | Native | `bof-DelTaskScheduler` (`schtasks delete`) |
 | `schtaskscreate` | Native | `bof-schtaskscreate` (`schtasks create`) |
-| `ghost_task` | Upstream | trustedsec/CS-Remote-OPs-BOF |
+| `ghost_task` | Native | `bof-ghost-task` (register then deny Users read) |
 | `RegistryPersistence` | Native | `bof-runkey` |
 | `reg_set` | Native | `bof-regset` |
 | `reg_delete` | Native | `bof-regdelete` |
@@ -303,6 +306,9 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `LNKgenerator-BOF` | Native | `bof-lnkgenerator` |
 | `AddFirewallRule` | Native | `bof-addfirewallrule` |
 | `AddLocalCert` | Native | `bof-addlocalcert` |
+| `wmisubscription` | Native | `bof-wmisubscription` (permanent WMI filter/consumer/binding) |
+| `ifeo` | Native | `bof-ifeo` (Image File Execution Options debugger) |
+| `printmonitor` | Native | `bof-printmonitor` (Spooler monitor DLL registration) |
 
 ## 🏢 Active Directory Attacks (Specialized)
 
@@ -311,10 +317,12 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `PetitPotam` | Upstream | outflanknl/C2-Tool-Collection |
 | `purpleranges/bofs (regsave)` | Upstream | `purpleranges/bofs` |
 | `purpleranges/bofs (groupmod)` | Upstream | `purpleranges/bofs` |
-| `ndur0/bofs (dcsync)` | Upstream | `ndur0/bofs` |
+| `ndur0/bofs (dcsync)` | Native (partial) | `bof-dacledit dcsync` (replication ACEs only) |
 | `SQL-BOF` | Upstream | `Tw1sm/SQL-BOF` |
 | `EnumDotnet` | Native | `bof-enumdotnet` |
 | `gpocheck` | Native | `bof-gpocheck` (GPO links + GPP `cpassword` decrypt) |
+| `dacledit` | Native | `bof-dacledit` (DACL edit: dcsync/genericall/writeowner/remove) |
+| `shadowcred` | Native | `bof-shadowcred` (`msDS-KeyCredentialLink` writer) |
 | `trustdump` | Native | `bof-trustdump` (`DsEnumerateDomainTrusts`) |
 
 ## 🧰 Utility & Intel Gathering
@@ -326,7 +334,7 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `screenspy` | Native | `bof-screenspy` (repeated BMP captures) |
 | `keylogger` | Native (partial) | `bof-keylogger` (duration-limited low-level hook) |
 | `browserhist` | Native | `bof-browserhist` (Chrome/Edge `History` SQLite) |
-| `findcreds` | Native (partial) | `bof-findcreds` (name/content heuristics) |
+| `findcreds` | Native (partial) | `bof-findcreds` (filename heuristics + built-in keywords or user regex) |
 | `ScreenshotBOF` | Native | `bof-screenshot` |
 | `GeoLocation_BOF` | Native (partial) | `bof-geolocation (region/timezone, not location bof-services)` |
 | `msi-search` | Native | `bof-msi-search` |
@@ -354,10 +362,10 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | Catalog BOF | Status | This kit / upstream |
 |---|---|---|
 | `LDAP-Bof-Collection` | Native (partial) | `bof-ldapsearch (generic)` |
-| `DCSync-Bof` | Upstream | `P0142/DCSync-Bof` |
-| `LSAdump-BOF` | Upstream | `shashinma/LSAdump-BOF` |
+| `DCSync-Bof` | Native (partial) | `bof-dacledit dcsync` (writes replication ACEs; replication itself upstream) |
+| `LSAdump-BOF` | Native (partial) | `bof-lsasecrets` (LsaRetrievePrivateData; no offline hive parsing) |
 | `NBTscan-BOF` | Native | `bof-nbtscan` |
-| `VaultDumpBOF` | Native (partial) | `bof-vaultdump` (enumerates items; protected data not decrypted) |
+| `VaultDumpBOF` | Native | `bof-vaultdump-full` (VaultGetItem authenticators) + `bof-vaultdump` (metadata) |
 | `Ada-PoisonKiller-BOF` | Upstream | `JohnRyk/...` |
 | `LSAWhisperer-BOF` | Upstream | `Art-Fakt/...` |
 | `AdaptixBOFs (DNS)` | Upstream | `ADHDMurky/AdaptixBOFs` |
@@ -366,5 +374,5 @@ Summary: **147 native**, **31 partially native**, **99 upstream-only** (277 rows
 | `Adaptix-EDR-Recon` | Native | `bof-edrrecon` |
 | `SeDebugPrivilege-BOF` | Native (partial) | `bof-tokenpriv + bof-inject` |
 | `Set-Password-Auth-BOF` | Upstream | `0xGunrunner/...` |
-| `add-rbcd-bof-fix` | Upstream | `0xGunrunner/...` |
+| `add-rbcd-bof-fix` | Native | `bof-rbcd` (`msDS-AllowedToActOnBehalfOfOtherIdentity`) |
 | `OSEP-ENUM` | Native (partial) | `bof-ldapsearch (generic)` |

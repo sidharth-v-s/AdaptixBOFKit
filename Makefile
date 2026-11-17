@@ -10,7 +10,8 @@ CC      := x86_64-w64-mingw32-gcc
 STRIP   := x86_64-w64-mingw32-strip
 CFLAGS  ?= -Iinclude -Os -w -DBOF -D_WIN32_WINNT=0x0601 \
            -fno-jump-tables -fno-asynchronous-unwind-tables \
-           -fno-stack-protector -mno-stack-arg-probe -fno-builtin
+           -fno-stack-protector -mno-stack-arg-probe -fno-builtin \
+           -fno-tree-loop-distribute-patterns
 
 SRC     := $(wildcard src/*.c)
 OBJ     := $(patsubst src/%.c,_bin/%.x64.o,$(SRC))

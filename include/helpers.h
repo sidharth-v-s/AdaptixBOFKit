@@ -68,6 +68,20 @@ static inline void bof_memcpy(void *dst, const void *src, unsigned int n)
     while (n--) *d++ = *s++;
 }
 
+static inline void bof_memmove(void *dst, const void *src, unsigned int n)
+{
+    unsigned char *d = (unsigned char *)dst;
+    const unsigned char *s = (const unsigned char *)src;
+    if (d == s || !n) return;
+    if (d < s) {
+        while (n--) *d++ = *s++;
+    } else {
+        d += n;
+        s += n;
+        while (n--) *--d = *--s;
+    }
+}
+
 static inline int bof_memcmp(const void *a, const void *b, unsigned int n)
 {
     const unsigned char *x = (const unsigned char *)a;
@@ -145,6 +159,15 @@ static inline char *bof_strstr(const char *hay, const char *needle)
     return 0;
 }
 
+static inline char *bof_strchr(const char *s, int c)
+{
+    while (s && *s) {
+        if (*s == (char)c) return (char *)s;
+        s++;
+    }
+    return NULL;
+}
+
 static inline int bof_atoi(const char *s)
 {
     int v = 0;
@@ -162,6 +185,110 @@ static inline void bof_itoa(unsigned long long v, char *out)
     while (v) { tmp[i++] = (char)('0' + (v % 10)); v /= 10; }
     while (i) out[j++] = tmp[--i];
     out[j] = 0;
+}
+
+/* Minimal snprintf: %s %c %d %u %x %X %% with optional zero/space padding
+ * and an ignored l/ll length modifier.  Sufficient for the BOFs here. */
+#include <stdarg.h>
+
+static inline void bof_fmt_uint(unsigned long long v, unsigned int base,
+                                int upper, char *out)
+{
+    const char *digits = upper ? "0123456789ABCDEF" : "0123456789abcdef";
+    char tmp[24];
+    int i = 0, j = 0;
+    if (!v) { out[0] = '0'; out[1] = 0; return; }
+    while (v) { tmp[i++] = digits[v % base]; v /= base; }
+    while (i) out[j++] = tmp[--i];
+    out[j] = 0;
+}
+
+static inline int bof_snprintf(char *out, int cap, const char *fmt, ...)
+{
+    va_list ap;
+    int o = 0;
+
+    if (!out || cap <= 0) return 0;
+    va_start(ap, fmt);
+    while (fmt && *fmt && o < cap - 1) {
+        if (*fmt != '%') {
+            out[o++] = *fmt++;
+            continue;
+        }
+        fmt++;
+        if (*fmt == '%') { out[o++] = '%'; fmt++; continue; }
+
+        {
+            char pad = ' ';
+            int width = 0, lmod = 0;
+            char num[32];
+            const char *val = NULL;
+            char chr[2] = {0, 0};
+            int len, neg = 0;
+
+            if (*fmt == '0') { pad = '0'; fmt++; }
+            while (*fmt >= '0' && *fmt <= '9') {
+                width = width * 10 + (*fmt - '0');
+                fmt++;
+            }
+            while (*fmt == 'l') { lmod++; fmt++; }
+
+            switch (*fmt) {
+            case 's':
+                val = va_arg(ap, const char *);
+                if (!val) val = "(null)";
+                break;
+            case 'c':
+                chr[0] = (char)va_arg(ap, int);
+                val = chr;
+                break;
+            case 'd': case 'i': {
+                long long sv;
+                if (lmod >= 2) sv = va_arg(ap, long long);
+                else sv = va_arg(ap, int);
+                if (sv < 0) { neg = 1; sv = -sv; }
+                bof_fmt_uint((unsigned long long)sv, 10, 0, num);
+                val = num;
+                break;
+            }
+            case 'u':
+                bof_fmt_uint(lmod >= 2
+                             ? va_arg(ap, unsigned long long)
+                             : (unsigned long long)va_arg(ap, unsigned int),
+                             10, 0, num);
+                val = num;
+                break;
+            case 'x':
+                bof_fmt_uint(lmod >= 2
+                             ? va_arg(ap, unsigned long long)
+                             : (unsigned long long)va_arg(ap, unsigned int),
+                             16, 0, num);
+                val = num;
+                break;
+            case 'X':
+                bof_fmt_uint(lmod >= 2
+                             ? va_arg(ap, unsigned long long)
+                             : (unsigned long long)va_arg(ap, unsigned int),
+                             16, 1, num);
+                val = num;
+                break;
+            default:
+                out[o++] = '%';
+                if (*fmt) out[o++] = *fmt;
+                if (*fmt) fmt++;
+                continue;
+            }
+            fmt++;
+
+            len = bof_strlen(val) + (neg ? 1 : 0);
+            while (len < width && o < cap - 1) { out[o++] = pad; width--; }
+            if (neg && o < cap - 1) out[o++] = '-';
+            while (*val && o < cap - 1) out[o++] = *val++;
+        }
+    }
+    va_end(ap);
+    out[o] = 0;
+    return o;
 }
 
 static inline void bof_hex(unsigned long long v, int width, char *out)

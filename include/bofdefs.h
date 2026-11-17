@@ -29,6 +29,7 @@
 #include <winsvc.h>
 #include <wincred.h>
 #include <winnetwk.h>
+#include <winhttp.h>
 #include <sddl.h>
 #define SECURITY_WIN32
 #include <security.h>
@@ -55,6 +56,7 @@
 #include <msi.h>
 #include <sspi.h>
 #include <dsgetdc.h>
+#include <rpc.h>
 
 /* DNS client cache (not declared by the MinGW headers we target). */
 typedef struct _DNS_CACHE_ENTRY {
@@ -657,6 +659,20 @@ typedef struct _BOF_VAULT_ITEM {
     DWORD Flags;
 } BOF_VAULT_ITEM, *PBOF_VAULT_ITEM;
 
+/* VAULT_ITEM as documented by vaultcli.h (credential + authenticator). */
+typedef struct _BOF_VAULT_ITEM_FULL {
+    GUID SchemaId;
+    DWORD_PTR FriendlyName;
+    PBOF_VAULT_ITEM_ELEMENT ResourceElement;
+    PBOF_VAULT_ITEM_ELEMENT IdentityElement;
+    PBOF_VAULT_ITEM_ELEMENT PackageSidElement;
+    PBOF_VAULT_ITEM_ELEMENT AuthenticatorElement;
+    FILETIME LastModified;
+    DWORD Flags;
+    DWORD PropertiesCount;
+    PBOF_VAULT_ITEM_ELEMENT Properties;
+} BOF_VAULT_ITEM_FULL, *PBOF_VAULT_ITEM_FULL;
+
 /* ------------------------------------------------------------------ */
 /* NT handle table (SystemHandleInformation)                           */
 /* ------------------------------------------------------------------ */
@@ -677,5 +693,101 @@ typedef struct _SYSTEM_HANDLE_INFORMATION {
     ULONG NumberOfHandles;
     SYSTEM_HANDLE_TABLE_ENTRY_INFO Handles[1];
 } SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
+
+/* SystemExtendedHandleInformation (class 64) entries carry the granted access
+ * mask, which is what handlestrip needs. */
+#ifndef SystemExtendedHandleInformation
+#define SystemExtendedHandleInformation 64
+#endif
+typedef struct _SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX {
+    PVOID     Object;
+    ULONG_PTR UniqueProcessId;
+    HANDLE    HandleValue;
+    ULONG     GrantedAccess;
+    USHORT    CreatorBackTraceIndex;
+    USHORT    ObjectTypeIndex;
+    ULONG     HandleAttributes;
+    ULONG     Reserved;
+} SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX, *PSYSTEM_HANDLE_TABLE_ENTRY_INFO_EX;
+
+typedef struct _SYSTEM_HANDLE_INFORMATION_EX {
+    ULONG_PTR NumberOfHandles;
+    ULONG_PTR Reserved;
+    SYSTEM_HANDLE_TABLE_ENTRY_INFO_EX Handles[1];
+} SYSTEM_HANDLE_INFORMATION_EX, *PSYSTEM_HANDLE_INFORMATION_EX;
+
+/* ------------------------------------------------------------------ */
+/* extra kernel32 (ACL editing, handles, remote patching)              */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$VirtualProtectEx(HANDLE, LPVOID, SIZE_T, DWORD, PDWORD);
+DECLSPEC_IMPORT DWORD  WINAPI KERNEL32$GetProcessId(HANDLE);
+DECLSPEC_IMPORT HANDLE WINAPI KERNEL32$CreateThread(LPSECURITY_ATTRIBUTES, SIZE_T, LPTHREAD_START_ROUTINE, LPVOID, DWORD, LPDWORD);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$DuplicateHandle(HANDLE, HANDLE, HANDLE, LPHANDLE, DWORD, BOOL, DWORD);
+DECLSPEC_IMPORT DWORD  WINAPI KERNEL32$GetOverlappedResult(HANDLE, LPOVERLAPPED, LPDWORD, BOOL);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$IsWow64Process(HANDLE, PBOOL);
+DECLSPEC_IMPORT BOOL   WINAPI KERNEL32$IsWow64Process2(HANDLE, USHORT *, USHORT *);
+
+/* ------------------------------------------------------------------ */
+/* extra advapi32 (security descriptors / ACL construction)           */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$InitializeAcl(PACL, DWORD, DWORD);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$AddAccessAllowedAce(PACL, DWORD, DWORD, PSID);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$AddAccessAllowedAceEx(PACL, DWORD, DWORD, DWORD, PSID);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$InitializeSecurityDescriptor(PSECURITY_DESCRIPTOR, DWORD);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$SetSecurityDescriptorDacl(PSECURITY_DESCRIPTOR, BOOL, PACL, BOOL);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$MakeSelfRelativeSD(PSECURITY_DESCRIPTOR, PSECURITY_DESCRIPTOR, LPDWORD);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$ConvertStringSecurityDescriptorToSecurityDescriptorA(LPCSTR, DWORD, PSECURITY_DESCRIPTOR *, PULONG);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$ConvertSecurityDescriptorToStringSecurityDescriptorA(PSECURITY_DESCRIPTOR, DWORD, SECURITY_INFORMATION, LPSTR *, PULONG);
+DECLSPEC_IMPORT DWORD WINAPI ADVAPI32$GetSecurityDescriptorLength(PSECURITY_DESCRIPTOR);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$GetSecurityDescriptorOwner(PSECURITY_DESCRIPTOR, PSID *, LPBOOL);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$GetSecurityDescriptorGroup(PSECURITY_DESCRIPTOR, PSID *, LPBOOL);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$SetSecurityDescriptorOwner(PSECURITY_DESCRIPTOR, PSID, BOOL);
+DECLSPEC_IMPORT BOOL WINAPI ADVAPI32$SetSecurityDescriptorGroup(PSECURITY_DESCRIPTOR, PSID, BOOL);
+DECLSPEC_IMPORT DWORD WINAPI ADVAPI32$GetLengthSid(PSID);
+
+/* ------------------------------------------------------------------ */
+/* extra bcrypt (RSA shadow credentials, AES-GCM, HMAC)               */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptGenerateKeyPair(BCRYPT_ALG_HANDLE, BCRYPT_KEY_HANDLE *, ULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptFinalizeKeyPair(BCRYPT_KEY_HANDLE, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptExportKey(BCRYPT_KEY_HANDLE, BCRYPT_KEY_HANDLE, LPCWSTR, PUCHAR, ULONG, ULONG *, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptImportKeyPair(BCRYPT_ALG_HANDLE, BCRYPT_KEY_HANDLE, LPCWSTR, BCRYPT_KEY_HANDLE *, PUCHAR, ULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptSignHash(BCRYPT_KEY_HANDLE, VOID *, PUCHAR, ULONG, PUCHAR, ULONG, ULONG *, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptVerifySignature(BCRYPT_KEY_HANDLE, VOID *, PUCHAR, ULONG, PUCHAR, ULONG, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptEncrypt(BCRYPT_KEY_HANDLE, PUCHAR, ULONG, PVOID, PUCHAR, ULONG, PUCHAR, ULONG, ULONG *, ULONG);
+DECLSPEC_IMPORT NTSTATUS WINAPI BCRYPT$BCryptGenRandom(BCRYPT_ALG_HANDLE, PUCHAR, ULONG, ULONG);
+
+/* ------------------------------------------------------------------ */
+/* winhttp (native WinRM / WS-Man)                                     */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT HINTERNET WINAPI WINHTTP$WinHttpOpen(LPCWSTR, DWORD, LPCWSTR, LPCWSTR, DWORD);
+DECLSPEC_IMPORT HINTERNET WINAPI WINHTTP$WinHttpConnect(HINTERNET, LPCWSTR, INTERNET_PORT, DWORD);
+DECLSPEC_IMPORT HINTERNET WINAPI WINHTTP$WinHttpOpenRequest(HINTERNET, LPCWSTR, LPCWSTR, LPCWSTR, LPCWSTR, LPCWSTR *, DWORD);
+DECLSPEC_IMPORT BOOL      WINAPI WINHTTP$WinHttpSendRequest(HINTERNET, LPCWSTR, DWORD, LPVOID, DWORD, DWORD, DWORD_PTR);
+DECLSPEC_IMPORT BOOL      WINAPI WINHTTP$WinHttpReceiveResponse(HINTERNET, LPVOID);
+DECLSPEC_IMPORT BOOL      WINAPI WINHTTP$WinHttpQueryHeaders(HINTERNET, DWORD, LPCWSTR, LPVOID, LPDWORD, LPDWORD);
+DECLSPEC_IMPORT BOOL      WINAPI WINHTTP$WinHttpQueryDataAvailable(HINTERNET, LPDWORD);
+DECLSPEC_IMPORT BOOL      WINAPI WINHTTP$WinHttpReadData(HINTERNET, LPVOID, DWORD, LPDWORD);
+DECLSPEC_IMPORT BOOL      WINAPI WINHTTP$WinHttpSetCredentials(HINTERNET, DWORD, DWORD, LPCWSTR, LPCWSTR, LPVOID);
+DECLSPEC_IMPORT BOOL      WINAPI WINHTTP$WinHttpSetOption(HINTERNET, DWORD, LPVOID, DWORD);
+DECLSPEC_IMPORT BOOL      WINAPI WINHTTP$WinHttpAddRequestHeaders(HINTERNET, LPCWSTR, DWORD, DWORD);
+DECLSPEC_IMPORT BOOL      WINAPI WINHTTP$WinHttpCloseHandle(HINTERNET);
+
+/* ------------------------------------------------------------------ */
+/* rpcrt4 / spoolss (PrintSpoofer-style coercion)                      */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT RPC_STATUS RPC_ENTRY RPCRT4$RpcStringBindingComposeA(RPC_CSTR, RPC_CSTR, RPC_CSTR, RPC_CSTR, RPC_CSTR, RPC_CSTR *);
+DECLSPEC_IMPORT RPC_STATUS RPC_ENTRY RPCRT4$RpcBindingFromStringBindingA(RPC_CSTR, RPC_BINDING_HANDLE *);
+DECLSPEC_IMPORT RPC_STATUS RPC_ENTRY RPCRT4$RpcBindingFree(RPC_BINDING_HANDLE *);
+DECLSPEC_IMPORT RPC_STATUS RPC_ENTRY RPCRT4$RpcStringFreeA(RPC_CSTR *);
+
+DECLSPEC_IMPORT DWORD WINAPI SPOOLSS$RpcOpenPrinter(const wchar_t *, handle_t *, const wchar_t *, void *, DWORD);
+DECLSPEC_IMPORT DWORD WINAPI SPOOLSS$RpcClosePrinter(handle_t *);
+DECLSPEC_IMPORT DWORD WINAPI SPOOLSS$RpcRemoteFindFirstPrinterChangeNotificationEx(handle_t, DWORD, DWORD, wchar_t *, DWORD, wchar_t *);
+
+/* ------------------------------------------------------------------ */
+/* vault: item retrieval (vaultcli.h is not shipped by MinGW)          */
+/* ------------------------------------------------------------------ */
+DECLSPEC_IMPORT DWORD WINAPI VAULTCLI$VaultGetItem(HANDLE, const GUID *, PBOF_VAULT_ITEM_ELEMENT, PBOF_VAULT_ITEM_ELEMENT, PBOF_VAULT_ITEM_ELEMENT, PVOID *);
 
 #endif /* ADAPTIX_BOFDEFS_H */
