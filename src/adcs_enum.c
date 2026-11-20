@@ -68,8 +68,9 @@ static void enum_templates(LDAP *ld, const char *config)
                                     "(objectClass=pKICertificateTemplate)",
                                     attrs, 0, NULL, NULL, NULL, 500, &res);
     if (rc != LDAP_SUCCESS) {
-        BeaconPrintf(CALLBACK_ERROR, "template search failed: %lu (%s)\n",
-                     (unsigned long)rc, WLDAP32$ldap_err2stringA(rc));
+        bof_error_ldap("certificate template ldap_search", rc,
+                       "cannot enumerate pKICertificateTemplate objects");
+        bof_error_context("base", base);
         return;
     }
 
@@ -133,8 +134,9 @@ static void enum_services(LDAP *ld, const char *config)
                                     "(objectClass=pKIEnrollmentService)",
                                     attrs, 0, NULL, NULL, NULL, 100, &res);
     if (rc != LDAP_SUCCESS) {
-        BeaconPrintf(CALLBACK_ERROR, "enrollment service search failed: %lu (%s)\n",
-                     (unsigned long)rc, WLDAP32$ldap_err2stringA(rc));
+        bof_error_ldap("enrollment service ldap_search", rc,
+                       "cannot enumerate pKIEnrollmentService objects");
+        bof_error_context("base", base);
         return;
     }
 
@@ -227,6 +229,7 @@ void go(char *args, int alen)
     int len;
     int want_templates = 1, want_services = 1, want_ca = 1;
     LDAP *ld;
+    ULONG rc;
     char config[1024];
 
     if (args && alen > 0) {
@@ -254,13 +257,15 @@ void go(char *args, int alen)
     if (want_ca) enum_ca_registry();
 
     if (want_templates || want_services) {
-        ld = bof_ldap_open();
+        ld = bof_ldap_open_ex(&rc);
         if (!ld) {
-            BeaconPrintf(CALLBACK_ERROR, "LDAP connect/bind failed\n");
+            bof_error_ldap("ldap_init/bind", rc,
+                           "cannot reach or authenticate to a domain controller");
             return;
         }
-        if (bof_ldap_config_nc(ld, config, sizeof(config)) != 0) {
-            BeaconPrintf(CALLBACK_ERROR, "could not read configurationNamingContext\n");
+        if (bof_ldap_config_nc_ex(ld, config, sizeof(config), &rc) != 0) {
+            bof_error_ldap("rootDSE configurationNamingContext", rc,
+                           "cannot read the AD configuration naming context");
             WLDAP32$ldap_unbind(ld);
             return;
         }

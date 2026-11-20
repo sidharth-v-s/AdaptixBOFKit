@@ -182,20 +182,23 @@ void go(char *args, int alen)
     int nclen = 0;
     char base[512], part[768];
     LDAP *ld;
+    ULONG rc;
 
     BeaconDataParse(&parser, args, alen);
     nc = BeaconDataExtract(&parser, &nclen);
     if (!nc) nc = "";
 
-    ld = bof_ldap_open();
+    ld = bof_ldap_open_ex(&rc);
     if (!ld) {
-        BeaconPrintf(CALLBACK_ERROR, "LDAP connect/bind failed\n");
+        bof_error_ldap("ldap_init/bind", rc,
+                       "cannot reach or authenticate to a domain controller");
         return;
     }
     if (nc[0]) {
         bof_strncpy(base, nc, sizeof(base));
-    } else if (bof_ldap_default_nc(ld, base, sizeof(base)) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "could not read defaultNamingContext\n");
+    } else if (bof_ldap_default_nc_ex(ld, base, sizeof(base), &rc) != 0) {
+        bof_error_ldap("rootDSE defaultNamingContext", rc,
+                       "cannot read the domain naming context");
         WLDAP32$ldap_unbind(ld);
         return;
     }

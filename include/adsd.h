@@ -44,7 +44,10 @@ static inline int bof_ldap_resolve_dn(LDAP *ld, const char *base,
     ULONG rc;
     int ok = -1;
 
-    if (!target || !target[0]) return -1;
+    if (!target || !target[0]) {
+        bof_error_text("resolve DN", "empty sAMAccountName/DN");
+        return -1;
+    }
     if (bof_strchr(target, ',') && bof_strchr(target, '=')) {
         bof_strncpy(out, target, outsz);
         return 0;
@@ -62,12 +65,27 @@ static inline int bof_ldap_resolve_dn(LDAP *ld, const char *base,
     attrs[1] = NULL;
     rc = WLDAP32$ldap_search_ext_sA(ld, (PCHAR)base, LDAP_SCOPE_SUBTREE,
                                     filter, attrs, 0, NULL, NULL, NULL, 1, &res);
-    if (rc == LDAP_SUCCESS && res) {
-        e = WLDAP32$ldap_first_entry(ld, res);
-        if (e && bof_ldap_get_str(ld, e, "distinguishedName", out, outsz) == 0)
-            ok = 0;
-        WLDAP32$ldap_msgfree(res);
+    if (rc != LDAP_SUCCESS) {
+        bof_error_ldap("ldap_search(resolve DN)", rc,
+                       "could not resolve the account to a distinguished name");
+        bof_error_context("target", target);
+        bof_error_context("base", base);
+        return -1;
     }
+    if (!res) {
+        bof_error_text("resolve DN", "LDAP returned no result set");
+        bof_error_context("target", target);
+        return -1;
+    }
+
+    e = WLDAP32$ldap_first_entry(ld, res);
+    if (e && bof_ldap_get_str(ld, e, "distinguishedName", out, outsz) == 0)
+        ok = 0;
+    else {
+        bof_error_text("resolve DN", "no matching directory object");
+        bof_error_context("target", target);
+    }
+    WLDAP32$ldap_msgfree(res);
     return ok;
 }
 
@@ -90,7 +108,18 @@ static inline int bof_ldap_read_bin(LDAP *ld, const char *dn, const char *attr,
     rc = WLDAP32$ldap_search_ext_sA(ld, (PCHAR)dn, LDAP_SCOPE_BASE,
                                     "(objectClass=*)", attrs, 0, NULL, NULL,
                                     NULL, 1, &res);
-    if (rc != LDAP_SUCCESS || !res) return -1;
+    if (rc != LDAP_SUCCESS) {
+        bof_error_ldap("ldap_search(read attribute)", rc,
+                       "could not read the directory attribute");
+        bof_error_context("dn", dn);
+        bof_error_context("attr", attr);
+        return -1;
+    }
+    if (!res) {
+        bof_error_text("read attribute", "LDAP returned no result set");
+        bof_error_context("dn", dn);
+        return -1;
+    }
 
     e = WLDAP32$ldap_first_entry(ld, res);
     if (e) {
@@ -104,9 +133,18 @@ static inline int bof_ldap_read_bin(LDAP *ld, const char *dn, const char *attr,
                 *out = buf;
                 *outlen = vals[0]->bv_len;
                 ok = 0;
+            } else {
+                bof_error_win32("VirtualAlloc(attribute)", KERNEL32$GetLastError(),
+                                "cannot allocate memory for the attribute value");
+                bof_error_num("size", (unsigned long long)vals[0]->bv_len);
             }
+        } else {
+            BeaconPrintf(CALLBACK_OUTPUT, "[*] attribute not present: %s\n", attr);
         }
         if (vals) WLDAP32$ldap_value_free_len(vals);
+    } else {
+        bof_error_text("read attribute", "DN not found in the directory");
+        bof_error_context("dn", dn);
     }
     WLDAP32$ldap_msgfree(res);
     return ok;
@@ -193,9 +231,15 @@ static inline PSID bof_resolve_sid(const char *name)
 {
     PSID sid = NULL;
 
-    if (!name || !name[0]) return NULL;
+    if (!name || !name[0]) {
+        bof_error_text("resolve SID", "empty account name");
+        return NULL;
+    }
     if ((name[0] == 'S' || name[0] == 's') && name[1] == '-') {
         if (ADVAPI32$ConvertStringSidToSidA(name, &sid)) return sid;
+        bof_error_win32("ConvertStringSidToSid", KERNEL32$GetLastError(),
+                        "the string is not a valid SID");
+        bof_error_context("sid", name);
         return NULL;
     }
     {
@@ -204,13 +248,28 @@ static inline PSID bof_resolve_sid(const char *name)
         SID_NAME_USE use;
         dsize = sizeof(dom);
         if (!ADVAPI32$LookupAccountNameA(NULL, name, NULL, &size, dom,
-                                         &dsize, &use))
-            return NULL;
+                                         &dsize, &use)) {
+            DWORD err = KERNEL32$GetLastError();
+            if (err != ERROR_INSUFFICIENT_BUFFER) {
+                bof_error_win32("LookupAccountName(size)", err,
+                                "cannot resolve the account name on this host");
+                bof_error_context("account", name);
+                return NULL;
+            }
+        }
         sid = (PSID)KERNEL32$LocalAlloc(0, size);
-        if (!sid) return NULL;
+        if (!sid) {
+            bof_error_win32("LocalAlloc(SID)", KERNEL32$GetLastError(),
+                            "cannot allocate memory for the SID");
+            bof_error_num("size", (unsigned long long)size);
+            return NULL;
+        }
         dsize = sizeof(dom);
         if (!ADVAPI32$LookupAccountNameA(NULL, name, sid, &size, dom,
                                          &dsize, &use)) {
+            bof_error_win32("LookupAccountName", KERNEL32$GetLastError(),
+                            "cannot resolve the account name on this host");
+            bof_error_context("account", name);
             KERNEL32$LocalFree(sid);
             return NULL;
         }
@@ -227,11 +286,23 @@ static inline unsigned char *bof_sd_make_relative(PSECURITY_DESCRIPTOR absd,
 
     *outlen = 0;
     ADVAPI32$MakeSelfRelativeSD(absd, NULL, &need);
-    if (need == 0 || need > 0x100000) return NULL;
+    if (need == 0 || need > 0x100000) {
+        bof_error_win32("MakeSelfRelativeSD(size)", KERNEL32$GetLastError(),
+                        "cannot determine the self-relative SD size");
+        bof_error_num("needed", (unsigned long long)need);
+        return NULL;
+    }
     out = (unsigned char *)KERNEL32$VirtualAlloc(NULL, need,
                 MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    if (!out) return NULL;
+    if (!out) {
+        bof_error_win32("VirtualAlloc(self-relative SD)", KERNEL32$GetLastError(),
+                        "cannot allocate memory for the security descriptor");
+        bof_error_num("size", (unsigned long long)need);
+        return NULL;
+    }
     if (!ADVAPI32$MakeSelfRelativeSD(absd, (PSECURITY_DESCRIPTOR)out, &need)) {
+        bof_error_win32("MakeSelfRelativeSD", KERNEL32$GetLastError(),
+                        "cannot convert the security descriptor");
         KERNEL32$VirtualFree(out, 0, MEM_RELEASE);
         return NULL;
     }

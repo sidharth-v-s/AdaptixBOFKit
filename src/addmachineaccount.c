@@ -27,13 +27,15 @@ void go(char *args, int alen)
         return;
     }
 
-    ld = bof_ldap_open();
+    ld = bof_ldap_open_ex(&rc);
     if (!ld) {
-        BeaconPrintf(CALLBACK_ERROR, "LDAP connect/bind failed\n");
+        bof_error_ldap("ldap_init/bind", rc,
+                       "cannot reach or authenticate to a domain controller");
         return;
     }
-    if (bof_ldap_default_nc(ld, base, sizeof(base)) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "could not read defaultNamingContext\n");
+    if (bof_ldap_default_nc_ex(ld, base, sizeof(base), &rc) != 0) {
+        bof_error_ldap("rootDSE defaultNamingContext", rc,
+                       "cannot read the domain naming context");
         WLDAP32$ldap_unbind(ld);
         return;
     }
@@ -77,9 +79,11 @@ void go(char *args, int alen)
     rc = WLDAP32$ldap_add_ext_sA(ld, dn, mods, NULL, NULL);
     if (rc == LDAP_SUCCESS)
         BeaconPrintf(CALLBACK_OUTPUT, "Created %s (sAMAccountName=%s)\n", dn, sam);
-    else
-        BeaconPrintf(CALLBACK_ERROR, "ldap_add failed: %lu (%s)\n",
-                     (unsigned long)rc, WLDAP32$ldap_err2stringA(rc));
+    else {
+        bof_error_ldap("ldap_add", rc,
+                       "cannot create the machine account");
+        bof_error_context("dn", dn);
+    }
 
     WLDAP32$ldap_unbind(ld);
 }

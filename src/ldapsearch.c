@@ -32,17 +32,18 @@ void go(char *args, int alen)
     if (!attrarg) attrarg = "";
     if (!basearg) basearg = "";
 
-    ld = bof_ldap_open();
+    ld = bof_ldap_open_ex(&rc);
     if (!ld) {
-        BeaconPrintf(CALLBACK_ERROR, "LDAP connect/bind failed: %lu\n",
-                     (unsigned long)KERNEL32$GetLastError());
+        bof_error_ldap("ldap_init/bind", rc,
+                       "cannot reach or authenticate to a domain controller");
         return;
     }
 
     if (basearg[0]) {
         bof_strncpy(base, basearg, sizeof(base));
-    } else if (bof_ldap_default_nc(ld, base, sizeof(base)) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "could not read defaultNamingContext\n");
+    } else if (bof_ldap_default_nc_ex(ld, base, sizeof(base), &rc) != 0) {
+        bof_error_ldap("rootDSE defaultNamingContext", rc,
+                       "cannot read the domain naming context");
         WLDAP32$ldap_unbind(ld);
         return;
     }
@@ -68,8 +69,10 @@ void go(char *args, int alen)
                                     nattrs ? attrs : NULL, 0, NULL, NULL, NULL,
                                     500, &res);
     if (rc != LDAP_SUCCESS) {
-        BeaconPrintf(CALLBACK_ERROR, "ldap_search failed: %lu (%s)\n",
-                     (unsigned long)rc, WLDAP32$ldap_err2stringA(rc));
+        bof_error_ldap("ldap_search", rc,
+                       "directory query failed");
+        bof_error_context("base", base);
+        bof_error_context("filter", filter);
         WLDAP32$ldap_unbind(ld);
         return;
     }

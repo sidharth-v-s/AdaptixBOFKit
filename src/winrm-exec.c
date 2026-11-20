@@ -121,7 +121,11 @@ static int wsman_open(const char *host, int port, int secure)
 {
     wchar_t whost[256];
 
-    if (bof_a2w(host, whost, 256) <= 0) return -1;
+    if (bof_a2w(host, whost, 256) <= 0) {
+        bof_error_text("wsman_open", "host name is empty or too long");
+        bof_error_context("host", host);
+        return -1;
+    }
     bof_snprintf(g_endpoint, sizeof(g_endpoint), "%s://%s:%d/wsman",
                  secure ? "https" : "http", host, port);
 
@@ -129,9 +133,16 @@ static int wsman_open(const char *host, int port, int secure)
                                  WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
                                  WINHTTP_NO_PROXY_NAME,
                                  WINHTTP_NO_PROXY_BYPASS, 0);
-    if (!g_sess) return -1;
+    if (!g_sess) {
+        bof_error_win32("WinHttpOpen", KERNEL32$GetLastError(),
+                        "cannot initialize WinHTTP");
+        return -1;
+    }
     g_conn = WINHTTP$WinHttpConnect(g_sess, whost, (INTERNET_PORT)port, 0);
     if (!g_conn) {
+        bof_error_win32("WinHttpConnect", KERNEL32$GetLastError(),
+                        "cannot connect to the WinRM endpoint");
+        bof_error_context("endpoint", g_endpoint);
         WINHTTP$WinHttpCloseHandle(g_sess);
         g_sess = NULL;
         return -1;
@@ -157,12 +168,21 @@ static int wsman_post(const char *body, char *resp, int respcap, int *status)
 
     resp[0] = 0;
     if (status) *status = 0;
-    if (!g_conn) return -1;
+    if (!g_conn) {
+        bof_error_text("wsman_post", "no WinHTTP connection");
+        return -1;
+    }
 
     req = WINHTTP$WinHttpOpenRequest(g_conn, L"POST", L"/wsman", NULL,
                                      WINHTTP_NO_REFERER,
                                      WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
-    if (!req) return -1;
+    if (!req) {
+        bof_error_win32("WinHttpOpenRequest(POST /wsman)",
+                        KERNEL32$GetLastError(),
+                        "cannot create the WS-Man request");
+        bof_error_context("endpoint", g_endpoint);
+        return -1;
+    }
 
     if (g_have_creds) {
         WINHTTP$WinHttpSetCredentials(req, WINHTTP_AUTH_TARGET_SERVER,
@@ -177,13 +197,15 @@ static int wsman_post(const char *body, char *resp, int respcap, int *status)
             (DWORD)-1L, (LPVOID)body, (DWORD)bof_strlen(body),
             (DWORD)bof_strlen(body), 0);
     if (!ok) {
-        BeaconPrintf(CALLBACK_ERROR, "WinHttpSendRequest failed: %lu\n",
-                     (unsigned long)KERNEL32$GetLastError());
+        bof_error_win32("WinHttpSendRequest", KERNEL32$GetLastError(),
+                        "cannot send the WS-Man request");
+        bof_error_context("endpoint", g_endpoint);
         goto done;
     }
     if (!WINHTTP$WinHttpReceiveResponse(req, NULL)) {
-        BeaconPrintf(CALLBACK_ERROR, "WinHttpReceiveResponse failed: %lu\n",
-                     (unsigned long)KERNEL32$GetLastError());
+        bof_error_win32("WinHttpReceiveResponse", KERNEL32$GetLastError(),
+                        "no response from the WinRM endpoint (listener/firewall?)");
+        bof_error_context("endpoint", g_endpoint);
         goto done;
     }
 
@@ -197,10 +219,18 @@ static int wsman_post(const char *body, char *resp, int respcap, int *status)
 
     for (;;) {
         avail = 0;
-        if (!WINHTTP$WinHttpQueryDataAvailable(req, &avail)) break;
+        if (!WINHTTP$WinHttpQueryDataAvailable(req, &avail)) {
+            bof_error_win32("WinHttpQueryDataAvailable", KERNEL32$GetLastError(),
+                            "failed while waiting for the WS-Man response");
+            break;
+        }
         if (!avail) break;
         if ((int)(total + avail) >= respcap - 1) break;
-        if (!WINHTTP$WinHttpReadData(req, resp + total, avail, &got)) break;
+        if (!WINHTTP$WinHttpReadData(req, resp + total, avail, &got)) {
+            bof_error_win32("WinHttpReadData", KERNEL32$GetLastError(),
+                            "failed while reading the WS-Man response");
+            break;
+        }
         if (!got) break;
         total += got;
     }
@@ -338,7 +368,7 @@ void go(char *args, int alen)
     if (user[0]) {
         if (bof_a2w(user, g_wuser, 256) <= 0 ||
             bof_a2w(pass, g_wpass, 256) <= 0) {
-            BeaconPrintf(CALLBACK_ERROR, "credentials too long\n");
+            bof_error_text("credentials", "user name or password is too long");
             return;
         }
         g_have_creds = 1;
@@ -347,15 +377,15 @@ void go(char *args, int alen)
     resp = (char *)KERNEL32$VirtualAlloc(NULL, WSMAN_RESP_MAX,
                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     if (!resp) {
-        BeaconPrintf(CALLBACK_ERROR, "allocation failed\n");
+        bof_error_win32("VirtualAlloc(response)", KERNEL32$GetLastError(),
+                        "cannot allocate the WS-Man response buffer");
+        bof_error_num("size", (unsigned long long)WSMAN_RESP_MAX);
         return;
     }
 
     BeaconPrintf(CALLBACK_OUTPUT, "[*] endpoint: %s://%s:%d/wsman\n",
                  secure ? "https" : "http", host, port);
     if (wsman_open(host, port, secure) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "WinHttpOpen/Connect failed: %lu\n",
-                     (unsigned long)KERNEL32$GetLastError());
         goto done;
     }
 
@@ -371,13 +401,14 @@ void go(char *args, int alen)
 
     rc = wsman_post(body, resp, WSMAN_RESP_MAX, &status);
     if (rc <= 0 || (status != 200 && status != 201)) {
-        BeaconPrintf(CALLBACK_ERROR, "create shell failed (HTTP %d, %d bytes)\n",
-                     status, rc);
+        bof_error_text("create shell", "WinRM rejected the shell creation");
+        bof_error_num("http_status", (unsigned long long)status);
+        bof_error_num("bytes", (unsigned long long)(rc > 0 ? rc : 0));
         if (rc > 0) BeaconPrintf(CALLBACK_OUTPUT, "%.600s\n", resp);
         goto done;
     }
     if (xml_value(resp, "ShellId", shell, sizeof(shell)) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "no ShellId in create response\n");
+        bof_error_text("create shell", "no ShellId in the response");
         BeaconPrintf(CALLBACK_OUTPUT, "%.600s\n", resp);
         goto done;
     }
@@ -408,13 +439,14 @@ void go(char *args, int alen)
 
     rc = wsman_post(body, resp, WSMAN_RESP_MAX, &status);
     if (rc <= 0 || status != 200) {
-        BeaconPrintf(CALLBACK_ERROR, "command failed (HTTP %d, %d bytes)\n",
-                     status, rc);
+        bof_error_text("run command", "WinRM rejected the command request");
+        bof_error_num("http_status", (unsigned long long)status);
+        bof_error_num("bytes", (unsigned long long)(rc > 0 ? rc : 0));
         if (rc > 0) BeaconPrintf(CALLBACK_OUTPUT, "%.600s\n", resp);
         goto done;
     }
     if (xml_value(resp, "CommandId", cmdid, sizeof(cmdid)) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "no CommandId in command response\n");
+        bof_error_text("run command", "no CommandId in the response");
         BeaconPrintf(CALLBACK_OUTPUT, "%.600s\n", resp);
         goto done;
     }
@@ -439,7 +471,9 @@ void go(char *args, int alen)
 
         rc = wsman_post(body, resp, WSMAN_RESP_MAX, &status);
         if (rc <= 0) {
-            BeaconPrintf(CALLBACK_ERROR, "receive failed (HTTP %d)\n", status);
+            bof_error_text("receive output", "no response while polling for output");
+            bof_error_num("http_status", (unsigned long long)status);
+            bof_error_context("command_id", cmdid);
             break;
         }
         print_streams(resp);
@@ -451,7 +485,8 @@ void go(char *args, int alen)
 
         if (done) break;
         if (xml_has(resp, "faultcode") || xml_has(resp, "s:Fault")) {
-            BeaconPrintf(CALLBACK_ERROR, "WS-Man fault:\n%.600s\n", resp);
+            bof_error_text("WS-Man fault", "the endpoint returned a SOAP fault");
+            BeaconPrintf(CALLBACK_OUTPUT, "%.600s\n", resp);
             break;
         }
         KERNEL32$Sleep(100);
@@ -472,6 +507,11 @@ void go(char *args, int alen)
     rc = wsman_post(body, resp, WSMAN_RESP_MAX, &status);
     if (rc >= 0 && (status == 200 || status == 204))
         BeaconPrintf(CALLBACK_OUTPUT, "[*] shell %s deleted\n", shell);
+    else {
+        bof_error_text("delete shell", "WinRM did not confirm shell cleanup");
+        bof_error_num("http_status", (unsigned long long)status);
+        bof_error_context("shell_id", shell);
+    }
 
 done:
     if (cmd_ok && shell_ok) { /* already cleaned up above when reachable */ }

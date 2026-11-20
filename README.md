@@ -30,6 +30,7 @@ AdaptixBOFKit/
 │   ├── beacon.h             # Adaptix-supported Beacon API surface
 │   ├── bofdefs.h            # DLL$Function declarations
 │   ├── helpers.h            # CRT-free string/memory/format helpers
+│   ├── errhelp.h            # detailed error names and reporting helpers
 │   ├── sqlite.h             # minimal read-only SQLite reader
 │   ├── tokenhelpers.h       # token name/SID/elevation helpers
 │   ├── ldaphelpers.h        # LDAP bind / rootDSE helpers
@@ -83,13 +84,48 @@ The extension registers command groups:
 |---|---|
 | `AdaptixBOFKit-Recon` (55) | `bof-whoami`, `bof-env`, `bof-ipconfig`, `bof-arp`, `bof-netstat`, `bof-routeprint`, `bof-uptime`, `bof-listpipes`, `bof-drives`, `bof-locale`, `bof-resources`, `bof-windowlist`, `bof-listmods`, `bof-sessions`, `bof-dir`, `bof-proclist`, `bof-services`, `bof-drivers`, `bof-tasklist`, `bof-netconn`, `bof-driversigs`, `bof-wmi_query`, `bof-msi-search`, `bof-useridletime`, `bof-sessioninfo`, `bof-regqueryrec`, `bof-auditpol`, `bof-findmodule`, `bof-filterdrivers`, `bof-scenum`, `bof-regsession`, `bof-edrrecon`, `bof-enumsysmon`, `bof-whereami`, `bof-enumrwx`, `bof-vulndrivers`, `bof-enumdotnet`, `bof-safeharbor`, `bof-enumdrives`, `bof-enumlib`, `bof-cacls`, `bof-geolocation`, `bof-evtxsearch`, `bof-finduserhooks`, `bof-enumhandles`, `bof-EnumHandles`, `bof-processhandles`, `bof-ProcessListHandles`, `bof-killprocess`, `bof-vssenum`, `bof-wfpenum`, `bof-screenspy`, `bof-keylogger`, `bof-browserhist`, `bof-findcreds` |
 | `AdaptixBOFKit-Network` (22) | `bof-portscan`, `bof-nslookup`, `bof-netshares`, `bof-netview`, `bof-netuse`, `bof-netuse-list`, `bof-nettime`, `bof-netloggedon`, `bof-netsession`, `bof-listdns`, `bof-probe`, `bof-smbinfo`, `bof-enumwebclient`, `bof-portscanbof`, `bof-netsession2`, `bof-netuse_add`, `bof-nbtscan`, `bof-smbexec`, `bof-wmiexec`, `bof-dcomexec`, `bof-scshell`, `bof-winrm-exec` |
-| `AdaptixBOFKit-AD` (25) | `bof-netuser`, `bof-netlocalgroups`, `bof-netlocalgroupmembers`, `bof-domaingroups`, `bof-netgroupmembers`, `bof-passwordpolicy`, `bof-domaininfo`, `bof-ldapsearch`, `bof-addmachineaccount`, `bof-lapsdump`, `bof-netgrouplist`, `bof-netgrouplistmembers`, `bof-netgrouplistmembers2`, `bof-netlocalgrouplist`, `bof-netlocalgrouplistmembers`, `bof-get_password_policy`, `bof-adcs_enum`, `bof-adcs_enum_com`, `bof-adcs_enum_com2`, `bof-ldapsecuritycheck`, `bof-kerberoast`, `bof-spnroast`, `bof-asreproast`, `bof-gpocheck`, `bof-trustdump` |
-| `AdaptixBOFKit-Creds` (18) | `bof-credman`, `bof-wifi`, `bof-autologon`, `bof-procdump`, `bof-regsave`, `bof-dpapissystem`, `bof-certdump`, `bof-clipboard`, `bof-notethief`, `bof-klist`, `bof-kerbhash`, `bof-dumpwifi`, `bof-wifipasswords`, `bof-vaultdump`, `bof-dpapiblobdec`, `bof-chromecreds`, `bof-recentfiles`, `bof-sshagentkeys` |
-| `AdaptixBOFKit-Privesc-Evasion` (30) | `bof-tokenpriv`, `bof-uacstatus`, `bof-unhook`, `bof-etwpatch`, `bof-amsipatch`, `bof-hidefile`, `bof-cleareventlog`, `bof-add-exclusion`, `bof-enableefs`, `bof-blindeventlog`, `bof-enumexclusions`, `bof-delexclusion`, `bof-get_priv`, `bof-startwebclient`, `bof-dllhijack`, `bof-maketoken`, `bof-stealtoken`, `bof-reverttoken`, `bof-listimpersonation`, `bof-getsystem-svc`, `bof-injectapc`, `bof-injectthread`, `bof-earlybird`, `bof-ghostwrite`, `bof-ppidspoof`, `bof-blockdlls`, `bof-acldeny`, `bof-timestomp`, `bof-schtaskshide`, `bof-threadhide` |
-| `AdaptixBOFKit-Persistence` (21) | `bof-regquery`, `bof-regset`, `bof-regdelete`, `bof-runkey`, `bof-svc-create`, `bof-svc-delete`, `bof-sc-config`, `bof-sc-start`, `bof-sc-stop`, `bof-schtasksenum`, `bof-schtasksquery`, `bof-schtaskscreate`, `bof-schtasksdelete`, `bof-schtasksrun`, `bof-AddTaskScheduler`, `bof-DelTaskScheduler`, `bof-comhunter`, `bof-trustme`, `bof-addlocalcert`, `bof-addfirewallrule`, `bof-lnkgenerator` |
+| `AdaptixBOFKit-AD` (30) | `bof-netuser`, `bof-netlocalgroups`, `bof-netlocalgroupmembers`, `bof-domaingroups`, `bof-netgroupmembers`, `bof-passwordpolicy`, `bof-domaininfo`, `bof-ldapsearch`, `bof-addmachineaccount`, `bof-lapsdump`, `bof-netgrouplist`, `bof-netgrouplistmembers`, `bof-netgrouplistmembers2`, `bof-netlocalgrouplist`, `bof-netlocalgrouplistmembers`, `bof-get_password_policy`, `bof-adcs_enum`, `bof-adcs_enum_com`, `bof-adcs_enum_com2`, `bof-ldapsecuritycheck`, `bof-kerberoast`, `bof-spnroast`, `bof-asreproast`, `bof-gpocheck`, `bof-trustdump`, `bof-dacledit`, `bof-shadowcred`, `bof-rbcd`, `bof-dnsdump`, `bof-groupmanagedpw` |
+| `AdaptixBOFKit-Creds` (22) | `bof-credman`, `bof-wifi`, `bof-autologon`, `bof-procdump`, `bof-regsave`, `bof-dpapissystem`, `bof-certdump`, `bof-clipboard`, `bof-notethief`, `bof-klist`, `bof-kerbhash`, `bof-dumpwifi`, `bof-wifipasswords`, `bof-vaultdump`, `bof-dpapiblobdec`, `bof-chromecreds`, `bof-recentfiles`, `bof-sshagentkeys`, `bof-lsasecrets`, `bof-dpapimasterkey`, `bof-vaultdump-full`, `bof-chromecreds-abe` |
+| `AdaptixBOFKit-Privesc-Evasion` (35) | `bof-tokenpriv`, `bof-uacstatus`, `bof-unhook`, `bof-etwpatch`, `bof-amsipatch`, `bof-hidefile`, `bof-cleareventlog`, `bof-add-exclusion`, `bof-enableefs`, `bof-blindeventlog`, `bof-enumexclusions`, `bof-delexclusion`, `bof-get_priv`, `bof-startwebclient`, `bof-dllhijack`, `bof-maketoken`, `bof-stealtoken`, `bof-reverttoken`, `bof-listimpersonation`, `bof-getsystem-svc`, `bof-injectapc`, `bof-injectthread`, `bof-earlybird`, `bof-ghostwrite`, `bof-ppidspoof`, `bof-blockdlls`, `bof-acldeny`, `bof-timestomp`, `bof-schtaskshide`, `bof-threadhide`, `bof-uacbypass`, `bof-printspoofer`, `bof-patchwow64`, `bof-handlestrip`, `bof-aclprotect` |
+| `AdaptixBOFKit-Persistence` (25) | `bof-regquery`, `bof-regset`, `bof-regdelete`, `bof-runkey`, `bof-svc-create`, `bof-svc-delete`, `bof-sc-config`, `bof-sc-start`, `bof-sc-stop`, `bof-schtasksenum`, `bof-schtasksquery`, `bof-schtaskscreate`, `bof-schtasksdelete`, `bof-schtasksrun`, `bof-AddTaskScheduler`, `bof-DelTaskScheduler`, `bof-comhunter`, `bof-trustme`, `bof-addlocalcert`, `bof-addfirewallrule`, `bof-lnkgenerator`, `bof-wmisubscription`, `bof-ifeo`, `bof-ghost-task`, `bof-printmonitor` |
 | `AdaptixBOFKit-Post` (12) | `bof-inject`, `bof-hashfile`, `bof-download`, `bof-screenshot`, `bof-enumfiles`, `bof-md5`, `bof-sha1`, `bof-sha256`, `bof-executesession`, `bof-selfdelete`, `bof-prefetchdel`, `bof-clearmplog` |
 
 All commands are registered for the `beacon` agent on Windows, all listeners.
+
+---
+
+## Diagnostics and error reporting
+
+Failures are reported with the operation name, the raw code in decimal and hex,
+the symbolic name (when known), a hint, and non-secret context such as the file
+path, registry key, PID, address or HTTP status:
+
+```
+[-] NetServerEnum failed
+    NetAPI  : 6118 (0x000017e6) ERROR_NO_BROWSER_SERVERS_FOUND
+    hint    : Computer Browser service is disabled; trying LDAP
+    domain  : CORP
+```
+
+The helpers live in `include/errhelp.h` and are available to every BOF through
+`helpers.h`:
+
+| Helper | Use for |
+|---|---|
+| `bof_error_win32(what, code, hint)` | `GetLastError()` / Win32 status |
+| `bof_error_netapi(what, code, hint)` | NetAPI errors (`6118`, ...) |
+| `bof_error_hresult(what, hr, hint)` | COM / Filter Manager HRESULTs |
+| `bof_error_ntstatus(what, status, hint)` | NTSTATUS (BCrypt, Nt*) |
+| `bof_error_ldap(what, rc, hint)` | LDAP result codes |
+| `bof_error_dns(what, status, hint)` | `DNS_STATUS` |
+| `bof_error_rpc(what, status, hint)` | RPC/SpoolSS status |
+| `bof_error_text(what, detail)` | plain description without a code |
+| `bof_error_context(key, value)` | non-secret context line |
+| `bof_error_num(key, value)` | numeric context (decimal + hex) |
+
+`BeaconPrintf` is line oriented: emit one complete line per call, never
+per-byte fragments. Do not pass passwords, tokens or credential blobs to these
+helpers.
 
 ---
 
@@ -131,7 +167,7 @@ Extension-Kit.
 | `bof-regqueryrec` | `bof-regqueryrec HKLM SOFTWARE\Test 3` | Recursive registry dump |
 | `bof-auditpol` | `bof-auditpol` | Advanced audit policy subcategories |
 | `bof-findmodule` | `bof-findmodule csagent.dll` | Processes with a module loaded |
-| `bof-filterdrivers` | `bof-filterdrivers` | Filesystem minifilters (Sysmon, AV) |
+| `bof-filterdrivers` | `bof-filterdrivers` | Filesystem minifilters (Sysmon, AV); registry fallback when `FilterFindFirst` is denied |
 | `bof-scenum` | `bof-scenum WinDefend` | One service in detail, or all services |
 | `bof-regsession` | `bof-regsession` | Loaded user hives from `HKEY_USERS` |
 | `bof-edrrecon` | `bof-edrrecon` | Known EDR/AV service + driver names |
@@ -162,7 +198,7 @@ Extension-Kit.
 | `bof-portscan` / `bof-portscanbof` | `bof-portscan 10.0.0.5 22,80,443,8000-8100` | Non-blocking TCP connect scan (500 ms) |
 | `bof-nslookup` | `bof-nslookup corp.local -t A -s 10.0.0.10` | A/AAAA/CNAME/MX/NS/PTR/TXT/SRV/SOA/ANY |
 | `bof-netshares` | `bof-netshares 10.0.0.5` | SMB shares via `NetShareEnum` |
-| `bof-netview` | `bof-netview CORP` | Domain computer list via `NetServerEnum` |
+| `bof-netview` | `bof-netview CORP` | Domain computer list; LDAP fallback when the Browser service is absent |
 | `bof-netuse` / `bof-netuse_add` | `bof-netuse \\10.0.0.5\C$ CORP\user pass` | Map a remote share |
 | `bof-netuse-list` | `bof-netuse-list` | List mapped network resources |
 | `bof-nettime` | `bof-nettime 10.0.0.5` | Remote clock, timezone and uptime |
@@ -308,7 +344,7 @@ Extension-Kit.
 | `bof-executesession` | `bof-executesession 2 C:\Windows\System32\cmd.exe` | Launch in another session via WTS token |
 | `bof-injectapc` | `bof-injectapc 1234 C:\Windows\Temp\payload.bin` | Queue-user-APC shellcode injection |
 | `bof-injectthread` | `bof-injectthread 1234 C:\Windows\Temp\payload.bin` | Remote injection through `NtCreateThreadEx` |
-| `bof-earlybird` | `bof-earlybird C:\Windows\System32\notepad.exe C:\Windows\Temp\payload.bin` | APC injection into a suspended process before entry |
+| `bof-earlybird` | `bof-earlybird C:\Windows\System32\notepad.exe C:\Windows\Temp\payload.bin` | APC injection into a suspended process before entry (executable path, not a PID) |
 | `bof-ghostwrite` | `bof-ghostwrite 1234 C:\Windows\Temp\payload.bin` | Section-backed injection without `WriteProcessMemory` |
 | `bof-selfdelete` | `bof-selfdelete reboot` | Reboot/helper-based removal of the agent image |
 | `bof-prefetchdel` | `bof-prefetchdel mimikatz.exe` | Delete matching Prefetch entries |
@@ -385,7 +421,9 @@ it.
    `include/bofdefs.h` if it is missing.
 4. Parse arguments with `BeaconDataParse` / `BeaconDataExtract` /
    `BeaconDataInt`.
-5. Print with `BeaconPrintf(CALLBACK_OUTPUT, ...)`.
+5. Print with `BeaconPrintf(CALLBACK_OUTPUT, ...)`; report failures with
+   `bof_error_*` from `errhelp.h` (included by `helpers.h`) instead of a bare
+   `failed: <code>` line.
 6. Add a command to `AdaptixBOFKit.axs` and register it in a group.
 
 Minimal example:

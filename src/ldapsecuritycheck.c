@@ -86,9 +86,10 @@ void go(char *args, int alen)
     reg_dword(HKEY_LOCAL_MACHINE, NTDS_KEY, "LdapEnforceChannelBinding",
               &cbinding, &have_cbinding);
 
-    ld = bof_ldap_open();
+    ld = bof_ldap_open_ex(&rc);
     if (!ld) {
-        BeaconPrintf(CALLBACK_ERROR, "LDAP connect/bind failed\n");
+        bof_error_ldap("ldap_init/bind", rc,
+                       "cannot reach or authenticate to a domain controller");
         goto verdict;
     }
 
@@ -100,8 +101,8 @@ void go(char *args, int alen)
     rc = WLDAP32$ldap_search_ext_sA(ld, "", LDAP_SCOPE_BASE, "(objectClass=*)",
                                     attrs, 0, NULL, NULL, NULL, 1, &res);
     if (rc != LDAP_SUCCESS) {
-        BeaconPrintf(CALLBACK_ERROR, "rootDSE query failed: %lu\n",
-                     (unsigned long)rc);
+        bof_error_ldap("rootDSE query", rc,
+                       "cannot read the domain controller rootDSE");
         WLDAP32$ldap_unbind(ld);
         goto verdict;
     }

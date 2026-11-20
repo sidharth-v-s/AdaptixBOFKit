@@ -48,13 +48,15 @@ void go(char *args, int alen)
     extra = BeaconDataExtract(&parser, &elen);
     if (!extra) extra = "";
 
-    ld = bof_ldap_open();
+    ld = bof_ldap_open_ex(&rc);
     if (!ld) {
-        BeaconPrintf(CALLBACK_ERROR, "LDAP connect/bind failed\n");
+        bof_error_ldap("ldap_init/bind", rc,
+                       "cannot reach or authenticate to a domain controller");
         return;
     }
-    if (bof_ldap_default_nc(ld, base, sizeof(base)) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "could not read defaultNamingContext\n");
+    if (bof_ldap_default_nc_ex(ld, base, sizeof(base), &rc) != 0) {
+        bof_error_ldap("rootDSE defaultNamingContext", rc,
+                       "cannot read the domain naming context");
         WLDAP32$ldap_unbind(ld);
         return;
     }
@@ -86,8 +88,9 @@ void go(char *args, int alen)
     rc = WLDAP32$ldap_search_ext_sA(ld, base, LDAP_SCOPE_SUBTREE, filter,
                                     attrs, 0, NULL, NULL, NULL, 1000, &res);
     if (rc != LDAP_SUCCESS) {
-        BeaconPrintf(CALLBACK_ERROR, "LDAP search failed: %lu (%s)\n",
-                     (unsigned long)rc, WLDAP32$ldap_err2stringA(rc));
+        bof_error_ldap("ldap_search", rc,
+                       "directory query failed");
+        bof_error_context("base", base);
         WLDAP32$ldap_unbind(ld);
         return;
     }

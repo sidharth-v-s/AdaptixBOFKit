@@ -91,8 +91,9 @@ static int roast_spn(LDAP *ld, char *base)
             "(!(userAccountControl:1.2.840.113556.1.4.803:=2)))",
             attrs, 0, NULL, NULL, NULL, 500, &res);
     if (rc != LDAP_SUCCESS) {
-        BeaconPrintf(CALLBACK_ERROR, "SPN search failed: %lu (%s)\n",
-                     (unsigned long)rc, WLDAP32$ldap_err2stringA(rc));
+        bof_error_ldap("SPN ldap_search", rc,
+                       "cannot enumerate servicePrincipalName accounts");
+        bof_error_context("base", base);
         return 0;
     }
 
@@ -136,8 +137,9 @@ static int roast_asrep(LDAP *ld, char *base)
             "(!(userAccountControl:1.2.840.113556.1.4.803:=2)))",
             attrs, 0, NULL, NULL, NULL, 500, &res);
     if (rc != LDAP_SUCCESS) {
-        BeaconPrintf(CALLBACK_ERROR, "AS-REP search failed: %lu (%s)\n",
-                     (unsigned long)rc, WLDAP32$ldap_err2stringA(rc));
+        bof_error_ldap("AS-REP ldap_search", rc,
+                       "cannot enumerate AS-REP roastable accounts");
+        bof_error_context("base", base);
         return 0;
     }
 
@@ -158,6 +160,7 @@ void go(char *args, int alen)
     int mlen = 0;
     char base[512];
     LDAP *ld;
+    ULONG rc;
     int do_spn, do_asrep;
 
     BeaconDataParse(&parser, args, alen);
@@ -173,13 +176,15 @@ void go(char *args, int alen)
         return;
     }
 
-    ld = bof_ldap_open();
+    ld = bof_ldap_open_ex(&rc);
     if (!ld) {
-        BeaconPrintf(CALLBACK_ERROR, "LDAP connect/bind failed\n");
+        bof_error_ldap("ldap_init/bind", rc,
+                       "cannot reach or authenticate to a domain controller");
         return;
     }
-    if (bof_ldap_default_nc(ld, base, sizeof(base)) != 0) {
-        BeaconPrintf(CALLBACK_ERROR, "could not read defaultNamingContext\n");
+    if (bof_ldap_default_nc_ex(ld, base, sizeof(base), &rc) != 0) {
+        bof_error_ldap("rootDSE defaultNamingContext", rc,
+                       "cannot read the domain naming context");
         WLDAP32$ldap_unbind(ld);
         return;
     }
